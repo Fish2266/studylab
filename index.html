@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>StudyLab — Flashcards, Learn &amp; Test</title>
+<meta name="description" content="A fast, private, offline-first study app with Flashcards, Learn, Test and Match modes. Your sets stay in your browser.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1116" media="(prefers-color-scheme: dark)">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b5bd6'/%3E%3Crect x='14' y='18' width='30' height='22' rx='4' fill='%23fff' opacity='.55'/%3E%3Crect x='20' y='24' width='30' height='22' rx='4' fill='%23fff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<link rel="stylesheet" href="css/modes.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="topbar" id="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="#/" aria-label="StudyLab home">
+      <svg class="brand__mark" viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+        <rect width="64" height="64" rx="14" fill="currentColor"/>
+        <rect x="13" y="17" width="31" height="23" rx="4" fill="#fff" opacity=".5"/>
+        <rect x="20" y="24" width="31" height="23" rx="4" fill="#fff"/>
+      </svg>
+      <span class="brand__name">StudyLab</span>
+    </a>
+
+    <nav class="topnav" aria-label="Main">
+      <a href="#/" data-nav="library">Library</a>
+      <a href="#/create" data-nav="create">Create</a>
+      <a href="#/import" data-nav="import">Import</a>
+    </nav>
+
+    <div class="topbar__spacer"></div>
+
+    <button class="icon-btn" id="btn-theme" type="button" title="Toggle theme (T)" aria-label="Toggle colour theme">
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-sun"><path d="M12 4V2m0 20v-2m8-8h2M2 12h2m13.66-5.66 1.41-1.41M4.93 19.07l1.41-1.41m0-11.32L4.93 4.93m14.14 14.14-1.41-1.41" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/><circle cx="12" cy="12" r="4.2" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true" class="ico-moon"><path d="M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></svg>
+    </button>
+
+    <button class="icon-btn" id="btn-shortcuts" type="button" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="6" width="20" height="12" rx="2.5" stroke="currentColor" stroke-width="2" fill="none"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    </button>
+
+    <a class="icon-btn" href="#/settings" id="btn-settings" title="Settings" aria-label="Settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="2" fill="none"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.03 1.56V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 8.9 19.3a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.54 15a1.7 1.7 0 0 0-1.56-1.03H2.9a2 2 0 1 1 0-4H3a1.7 1.7 0 0 0 1.56-1.03A1.7 1.7 0 0 0 4.22 7.1l-.06-.06A2 2 0 1 1 6.99 4.2l.06.06A1.7 1.7 0 0 0 8.92 4.6h.08A1.7 1.7 0 0 0 10.03 3V2.9a2 2 0 1 1 4 0V3a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9v.08A1.7 1.7 0 0 0 21 10.1h.1a2 2 0 1 1 0 4H21a1.7 1.7 0 0 0-1.56 1.03Z" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linejoin="round"/></svg>
+    </a>
+  </div>
+</header>
+
+<main id="main" class="main" tabindex="-1"></main>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite" aria-atomic="false"></div>
+<div id="modal-root"></div>
+<p class="sr-only" id="live-region" role="status" aria-live="polite"></p>
+
+<noscript>
+  <div class="noscript">StudyLab needs JavaScript to run. Please enable it in your browser.</div>
+</noscript>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
