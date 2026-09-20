@@ -87,8 +87,11 @@ function installServiceWorker() {
   if (!('serviceWorker' in navigator) || location.protocol === 'file:') return;
   // Boot is async, so `load` has usually fired by the time we get here —
   // waiting for it again would mean never registering at all.
+  // updateViaCache: 'none' so the browser fetches sw.js from the network on
+  // every check. Left to the HTTP cache, a new worker — and with it a new
+  // deploy — can sit unnoticed for as long as the cache headers allow.
   const register = () => navigator.serviceWorker
-    .register('sw.js')
+    .register('sw.js', { updateViaCache: 'none' })
     .catch(() => { /* offline support is a bonus, not a requirement */ });
   if (document.readyState === 'complete') register();
   else window.addEventListener('load', register, { once: true });

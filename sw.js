@@ -1,11 +1,15 @@
 /* sw.js — offline support.
  *
- * Strategy: stale-while-revalidate for same-origin GET requests inside this
- * scope. The page loads instantly from cache and quietly updates in the
- * background, so a new deploy is picked up on the next visit. Study data is NOT
- * here — that lives in IndexedDB and is never cached or uploaded.
+ * Strategy: the shell — the page itself, its CSS and its JS — is network-first
+ * with a cache fallback, so a deploy is live the moment you reload and the app
+ * still opens with no connection. Everything else is stale-while-revalidate.
+ *
+ * It used to be stale-while-revalidate throughout, which meant a fix took two
+ * reloads to appear: the first served the old files and only then refreshed
+ * the cache. Study data is NOT here — that lives in IndexedDB and is never
+ * cached or uploaded.
  */
-const VERSION = 'studylab-v4';
+const VERSION = 'studylab-v5';
 const SCOPE = new URL(self.registration.scope);
 
 const SHELL = [
@@ -64,6 +68,10 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url);
   if (url.origin !== SCOPE.origin || !url.pathname.startsWith(SCOPE.pathname)) return;
 
+  // The shell is what a deploy changes, so it is never served stale while a
+  // network is available.
+  const isShell = req.mode === 'navigate' || /\.(?:html|css|js)$/.test(url.pathname);
+
   event.respondWith((async () => {
     const cache = await caches.open(VERSION);
     const cached = await cache.match(req, { ignoreSearch: false });
@@ -73,7 +81,11 @@ self.addEventListener('fetch', (event) => {
       return res;
     }).catch(() => null);
 
-    if (cached) {
+    if (isShell) {
+      const fresh = await network;
+      if (fresh) return fresh;
+      if (cached) return cached;
+    } else if (cached) {
       event.waitUntil(network);
       return cached;
     }
