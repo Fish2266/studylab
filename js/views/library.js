@@ -20,8 +20,8 @@ export function render(mount) {
   const moreWrap = el('div', { style: { textAlign: 'center', marginTop: '18px' } });
 
   const search = el('input', {
-    class: 'input', type: 'search', placeholder: 'Search sets and terms…',
-    'aria-label': 'Search sets', style: { maxWidth: '280px' }, id: 'lib-search',
+    class: 'input toolbar__search toolbar__search--wide', type: 'search', placeholder: 'Search sets and terms…',
+    'aria-label': 'Search sets', id: 'lib-search',
   });
   const onSearch = debounce(() => { query = search.value.trim().toLowerCase(); shown = PAGE; paint(); }, 160);
   search.addEventListener('input', onSearch);

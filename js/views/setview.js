@@ -143,7 +143,7 @@ function termList(set, progress, rerender) {
   const listHost = el('div', { id: 'term-list' });
   const moreWrap = el('div', { style: { textAlign: 'center', marginTop: '10px' } });
 
-  const search = el('input', { class: 'input', type: 'search', placeholder: 'Filter terms…', 'aria-label': 'Filter terms', style: { maxWidth: '220px' } });
+  const search = el('input', { class: 'input toolbar__search', type: 'search', placeholder: 'Filter terms…', 'aria-label': 'Filter terms' });
   const onSearch = debounce(() => { query = search.value.trim().toLowerCase(); shown = CHUNK; paintRows(); }, 140);
   search.addEventListener('input', onSearch);
 

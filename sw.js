@@ -5,7 +5,7 @@
  * background, so a new deploy is picked up on the next visit. Study data is NOT
  * here — that lives in IndexedDB and is never cached or uploaded.
  */
-const VERSION = 'studylab-v1';
+const VERSION = 'studylab-v2';
 const SCOPE = new URL(self.registration.scope);
 
 const SHELL = [
@@ -13,6 +13,7 @@ const SHELL = [
   'index.html',
   'css/app.css',
   'css/modes.css',
+  'css/mobile.css',
   'js/main.js',
   'js/utils.js',
   'js/ui.js',

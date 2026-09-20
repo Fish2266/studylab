@@ -301,6 +301,8 @@ html[data-theme="dark"] #btn-theme .ico-moon { display: block; }
 .toolbar__title { margin-right: auto; font-size: 1.05rem; font-weight: 650; }
 .toolbar__controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .toolbar__controls .input, .toolbar__controls .select { width: auto; }
+.toolbar__search { max-width: 220px; }
+.toolbar__search--wide { max-width: 280px; }
 @media (max-width: 620px) {
   .toolbar__title { margin-right: 0; flex: 1 0 100%; }
   .toolbar__controls { flex: 1; }

@@ -1,0 +1,240 @@
+/* ==========================================================================
+   StudyLab — phone layer (iOS portrait)
+   Loaded last so it wins over app.css / modes.css without editing them.
+   1. Touch & iOS platform fixes   2. Safe area   3. Viewport units
+   4. Phone layout overrides
+   ========================================================================== */
+
+/* ---------- 1. Touch & iOS platform fixes ---------- */
+
+/* Hover effects latch on after a tap on touch devices — the card stays lifted
+   and the colour stays swapped until you tap elsewhere. Give coarse pointers a
+   press state instead. */
+@media (hover: none) {
+  .set-card:hover,
+  .mode-tile:hover,
+  .match-tile:hover:not([disabled]) { transform: none; box-shadow: var(--shadow-1); border-color: var(--c-border); }
+  .mode-tile:hover { border-color: var(--c-border); }
+  .match-tile:hover:not([disabled]) { border-color: var(--c-border-strong); box-shadow: none; }
+  .opt:hover:not([disabled]) { border-color: var(--c-border-strong); background: var(--c-surface); }
+  .opt:hover:not([disabled]) .opt__key { background: var(--c-surface-2); color: var(--c-text-dim); border-color: var(--c-border); }
+  .btn:hover { background: var(--btn-bg); border-color: var(--btn-bd); }
+  .btn--primary:hover { --btn-bg: var(--c-accent); }
+  .icon-btn:hover { background: transparent; color: var(--c-text-mid); }
+  .icon-btn[aria-pressed="true"]:hover { color: var(--c-accent-text); background: var(--c-accent-soft); }
+  .menu button:hover { background: none; }
+  a:hover { text-decoration: none; }
+
+  .set-card:active { transform: scale(.985); }
+  .mode-tile:active { transform: scale(.98); }
+  .icon-btn:active { background: var(--c-surface-2); }
+  .menu button:active { background: var(--c-surface-2); }
+}
+
+@media (pointer: coarse) {
+  /* Grey flash on every tap, and the accidental text selection from a
+     double-tap on a card or option. */
+  * { -webkit-tap-highlight-color: transparent; }
+  .btn, .icon-btn, .opt, .match-tile, .fc-card, .segment button, .mode-tile,
+  .set-card__link, .fc-round-btn, .topnav a, .swatch { -webkit-user-select: none; user-select: none; }
+
+  /* 30px icon buttons are below the 44pt minimum. Keep the drawn box but grow
+     the hit area outwards so nothing shifts. */
+  .icon-btn--sm { position: relative; }
+  .icon-btn--sm::after { content: ''; position: absolute; top: 50%; left: 50%; width: 44px; height: 44px; transform: translate(-50%, -50%); }
+  .icon-btn { width: 40px; height: 40px; }
+  .brand { position: relative; }
+  .brand::after { content: ''; position: absolute; top: 50%; left: -6px; width: 44px; height: 44px; transform: translateY(-50%); }
+  .toast__x { padding: 8px 10px; margin: -8px -6px -8px auto; }
+}
+
+/* iOS zooms the whole page when you focus a control whose text is under 16px,
+   and never zooms back out. Everything here is 14–15px, so every field in the
+   app triggers it. */
+@media (max-width: 860px) {
+  .input, .textarea, .select, .ans-input,
+  input[type="text"], input[type="search"], input[type="number"],
+  input[type="email"], input[type="url"], textarea, select { font-size: 16px; }
+  /* These two carry more specific rules in app.css and would otherwise stay
+     below the threshold. */
+  .edit-row .autogrow, .textarea { font-size: 16px; }
+  .btn--sm { font-size: .88rem; }
+}
+
+/* Momentum scrolling inside the panes that scroll independently. */
+.tbl__scroll, .modal__body, .fc-card__face, .study.is-full { -webkit-overflow-scrolling: touch; }
+
+/* ---------- 2. Safe area (notch / home indicator / landscape ears) ---------- */
+@media (max-width: 860px) {
+  .topbar__inner {
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+  .main {
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    padding-bottom: calc(96px + env(safe-area-inset-bottom));
+  }
+  .sticky-bar {
+    margin-left: calc(-1 * max(16px, env(safe-area-inset-left)));
+    margin-right: calc(-1 * max(16px, env(safe-area-inset-right)));
+    margin-bottom: calc(-96px - env(safe-area-inset-bottom));
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+  }
+  .toasts { bottom: calc(16px + env(safe-area-inset-bottom)); }
+  .study.is-full {
+    padding: max(14px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+             max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
+  }
+  .modal-backdrop { padding: 12px 12px calc(12px + env(safe-area-inset-bottom)); }
+}
+
+/* ---------- 3. Viewport units ---------- */
+/* Safari's toolbars shrink the visible area, but `vh` keeps reporting the tall
+   value — a `100vh` pane ends up with its last rows under the address bar. */
+@supports (height: 100dvh) {
+  .study { min-height: calc(100dvh - var(--topbar-h) - 40px); }
+  .modal { max-height: min(86dvh, 760px); }
+}
+
+/* ---------- 4. Phone layout ---------- */
+@media (max-width: 560px) {
+  :root { --topbar-h: 54px; }
+
+  .main { padding-top: 18px; }
+  h1 { font-size: 1.6rem; }
+  .page-head { gap: 12px; margin-bottom: 18px; }
+
+  /* Primary actions read better as a full-width pair than as two shrink-wrapped
+     buttons floating beside each other. */
+  .page-head__actions { width: 100%; }
+  .page-head__actions > .btn { flex: 1 1 0; min-width: 0; }
+  /* ...except icon-only menu triggers, which would stretch into a blank slab. */
+  .page-head__actions > .btn[aria-haspopup="menu"],
+  .page-head__actions > .icon-btn { flex: none; }
+
+  /* Search was collapsing to ~60px next to the sort select and the view
+     toggle. Give it its own full-width row above them. */
+  /* Flatten the control group into the bar itself so the search field, the
+     sort select and the view toggle wrap as one set: search takes the first
+     row, the select and the toggle share the second. Nested, the group kept
+     collapsing the search field to ~60px beside the toggle. */
+  .toolbar { gap: 8px; }
+  .toolbar__controls { display: contents; }
+  .toolbar .input { flex: 1 0 100%; width: 100%; max-width: none; }
+  .toolbar .select { flex: 1 1 auto; width: auto; min-width: 0; }
+  .toolbar > .segment, .toolbar__controls .segment { flex: none; }
+
+  /* Filter pills run past the right edge; let them scroll sideways as a strip
+     instead of clipping "Starred". */
+  .segment { display: flex; flex-wrap: nowrap; max-width: 100%; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+  .segment::-webkit-scrollbar { display: none; }
+  .segment button { flex: none; }
+
+  .set-grid { grid-template-columns: 1fr; gap: 10px; }
+  .mode-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .mode-tile { flex-direction: column; align-items: flex-start; gap: 6px; padding: 14px; }
+  .mode-tile svg { width: 22px; height: 22px; }
+  .mode-tile small { font-size: .75rem; line-height: 1.3; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .card__pad { padding: 15px; }
+  .panel { padding: 16px 15px; }
+  .empty { padding: 46px 12px; }
+  .grid2 { grid-template-columns: 1fr; gap: 0; }
+
+  /* Term rows: definition under the term, tools on their own aligned row. */
+  .term-row { grid-template-columns: minmax(0, 1fr) auto; padding: 12px; gap: 4px 10px; }
+
+  /* Editor rows were overflowing — the three-column grid could not fit the
+     number gutter, two fields and the tool cluster, so the tools were pushed
+     off the left edge. Stack them. */
+  .edit-row {
+    grid-template-columns: auto 1fr;
+    grid-template-areas: "n tools" "term term" "def def";
+    gap: 8px; padding: 12px;
+  }
+  .edit-row__n { grid-area: n; padding-top: 0; text-align: left; font-weight: 700; align-self: center; }
+  .edit-row .cell-term { grid-area: term; }
+  .edit-row .cell-def { grid-area: def; }
+  .edit-row .term-row__tools { grid-area: tools; justify-self: end; }
+
+  .modal { border-radius: var(--r-lg); }
+  .modal__head { padding: 16px 16px 10px; }
+  .modal__body { padding: 0 16px 4px; }
+  .modal__foot { padding: 14px 16px 16px; }
+  .modal__foot .btn { flex: 1 1 auto; }
+
+  /* Flashcards: the card was eating the whole screen and pushing "Know it" /
+     "Still learning" below the fold. */
+  /* The study pane reserves a full screen of height, which on a phone left a
+     dead band between the card and the sort buttons. Let it size to content
+     and give the card a fixed, comfortable height instead. */
+  .study { min-height: 0; gap: 12px; }
+  .fc-stage { flex: none; min-height: 0; }
+  .fc-card { min-height: 0; height: min(400px, 52dvh); }
+  .fc-card__face { padding: 26px 18px; }
+  .fc-card__text { font-size: clamp(1.15rem, 6vw, 1.7rem); }
+  .fc-sort { gap: 8px; }
+  .fc-sort .btn { flex: 1 1 0; min-width: 0; }
+  .fc-nav { gap: 14px; }
+
+  .study__head { gap: 8px; }
+  .study__title h1 { font-size: 1.05rem; }
+  .q-card { padding: 16px 15px 14px; }
+  .q-prompt { margin-bottom: 16px; }
+  .opt-grid { grid-template-columns: 1fr; }
+  .opt { min-height: 58px; padding: 12px 14px; }
+  .tf-grid { gap: 8px; }
+
+  /* Answer box and its submit button, side by side, both too narrow. */
+  .ans-form { gap: 8px; }
+  .ans-form .ans-input { flex: 1 0 100%; }
+  .ans-form .btn { flex: 1 1 auto; }
+
+  .match-board { gap: 8px; }
+  .match-tile { min-height: 88px; padding: 10px 8px; font-size: .87rem; }
+  .test-score__big { font-size: 3rem; }
+
+  /* The control on a settings row was being squeezed until the select clipped
+     its own text ("The definitio…"). Drop it to a full-width second line. */
+  .opt-row { gap: 8px; }
+  .opt-row__text { flex: 1 1 100%; }
+  .opt-row__ctl { flex: 1 1 100%; min-width: 0; }
+  .opt-row__ctl .select, .opt-row__ctl .input { width: 100%; }
+  .opt-row__ctl .switch, .opt-row__ctl .segment { flex: none; }
+  /* Controls that are already narrow — a switch, a stepper, a segmented
+     control — stay on the label's line, right-aligned. Only the wide ones
+     (select, text field) take a line of their own. */
+  .opt-row:has(.switch),
+  .opt-row:has(input[type="number"]),
+  .opt-row:has(.segment) { flex-wrap: nowrap; align-items: center; gap: 12px; }
+  .opt-row:has(.switch) .opt-row__text,
+  .opt-row:has(input[type="number"]) .opt-row__text,
+  .opt-row:has(.segment) .opt-row__text { flex: 1 1 auto; }
+  .opt-row:has(.switch) .opt-row__ctl,
+  .opt-row:has(input[type="number"]) .opt-row__ctl,
+  .opt-row:has(.segment) .opt-row__ctl { flex: none; width: auto; }
+
+  .swatch { width: 38px; height: 38px; }
+  .dropzone { padding: 26px 14px; }
+  .kbd-list { column-count: 1; }
+}
+
+/* Very narrow (iPhone SE / mini, 320–375pt) */
+@media (max-width: 380px) {
+  .mode-grid { grid-template-columns: 1fr; }
+  .mode-tile { flex-direction: row; align-items: center; }
+  .topnav a { padding: .4em .42em; font-size: .85rem; }
+  h1 { font-size: 1.4rem; }
+  .stats { grid-template-columns: 1fr 1fr; }
+}
+
+/* Landscape on a phone: the viewport is ~390pt tall, so the sticky topbar plus
+   a min-height study pane leaves almost nothing for the card. */
+@media (max-height: 460px) and (orientation: landscape) {
+  .topbar { position: static; }
+  .study { min-height: 0; }
+  .fc-card, .fc-stage { min-height: 200px; height: auto; }
+  .main { padding-top: 14px; padding-bottom: 40px; }
+}
