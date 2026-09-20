@@ -38,6 +38,10 @@ export function applyAppearance(settings) {
   const root = document.documentElement;
   currentPreference = settings.theme || 'system';
   root.dataset.theme = resolve(currentPreference);
+  // The settings live in IndexedDB, which only resolves well after the first
+  // paint. Mirroring the preference here lets the inline script in the head
+  // set the theme and the status bar synchronously on the next visit.
+  try { localStorage.setItem('studylab:theme', currentPreference); } catch { /* private mode */ }
   root.style.setProperty('--accent-h', String(settings.accentHue ?? 245));
   applyFavicon(settings.accentHue ?? 245);
   root.style.setProperty('--fs-scale', String(settings.fontScale ?? 1));
@@ -59,6 +63,10 @@ export function applyAppearance(settings) {
  * `theme-color`. Hard-coding it meant a white bar above an off-white page, so
  * read the live --c-bg token instead and the bar can never drift from the
  * background it sits against.
+ *
+ * The meta element is replaced rather than edited: Safari does not reliably
+ * repaint the bar when an existing meta's `content` changes under it, but it
+ * always picks up a freshly inserted one.
  */
 export function applyThemeColor() {
   const root = document.documentElement;
@@ -72,8 +80,12 @@ export function applyThemeColor() {
   const rgb = getComputedStyle(probe).color;
   probe.remove();
   if (!rgb) return;
-  document.querySelectorAll('meta[name="theme-color"]')
-    .forEach((m) => m.setAttribute('content', rgb));
+
+  for (const stale of document.querySelectorAll('meta[name="theme-color"]')) stale.remove();
+  const meta = document.createElement('meta');
+  meta.name = 'theme-color';
+  meta.content = rgb;
+  document.head.appendChild(meta);
 }
 
 export const THEME_LABEL = { system: 'Match my device', light: 'Light', dark: 'Dark' };

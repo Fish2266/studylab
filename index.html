@@ -6,12 +6,33 @@
 <title>StudyLab — Flashcards, Learn &amp; Test</title>
 <meta name="description" content="A fast, private, offline-first study app with Flashcards, Learn, Test and Match modes. Your sets stay in your browser.">
 <meta name="color-scheme" content="light dark">
-<!-- Seeded with the two --c-bg values so the bar is right before any script
-     runs; theme.js then keeps it in step with the in-app theme, which the
-     media queries below cannot see. -->
-<meta name="theme-color" content="#f6f6f9" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#13151b" media="(prefers-color-scheme: dark)">
+<!-- Only applies when the page has been added to the Home Screen, where iOS
+     paints the status bar itself and ignores theme-color. "black-translucent"
+     hands that strip back to the page, so it shows the app's own background;
+     .topbar then insets itself by the safe area. -->
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<!-- One ungated theme-color, owned by the script below and then by theme.js.
+     Media-gated copies cannot work here: the chosen theme lives in IndexedDB,
+     which resolves long after first paint, so a dark app on a light phone got
+     the light bar and kept it. -->
 <meta name="theme-color" content="#f6f6f9">
+
+<!-- Runs before the first paint. The real preference is in IndexedDB, so
+     theme.js mirrors it into localStorage for this script to read back on the
+     next visit — which settles both the status bar and the theme itself
+     before anything is drawn, instead of flashing the wrong one. -->
+<script>
+(function () {
+  var BG = { light: '#f6f6f9', dark: '#13151b' };   // the two --c-bg values
+  var pref = 'system';
+  try { pref = localStorage.getItem('studylab:theme') || 'system'; } catch (e) {}
+  var theme = pref === 'light' || pref === 'dark' ? pref
+    : (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  document.documentElement.dataset.theme = theme;
+  var m = document.querySelector('meta[name="theme-color"]');
+  if (m) m.setAttribute('content', BG[theme]);
+})();
+</script>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b5bd6'/%3E%3Crect x='14' y='18' width='30' height='22' rx='4' fill='%23fff' opacity='.55'/%3E%3Crect x='20' y='24' width='30' height='22' rx='4' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/modes.css">

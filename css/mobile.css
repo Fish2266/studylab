@@ -66,6 +66,9 @@
 
 /* ---------- 2. Safe area (notch / home indicator / landscape ears) ---------- */
 @media (max-width: 860px) {
+  /* Zero in a Safari tab, where Safari owns the status bar. On the Home
+     Screen the strip belongs to the page, so the bar has to step under it. */
+  .topbar { padding-top: env(safe-area-inset-top); }
   .topbar__inner {
     padding-left: max(10px, env(safe-area-inset-left));
     padding-right: max(10px, env(safe-area-inset-right));
