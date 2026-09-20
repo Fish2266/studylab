@@ -44,8 +44,7 @@ export function applyAppearance(settings) {
   root.dataset.readfont = settings.readFont || 'sans';
   if (settings.reduceMotion) root.dataset.motion = 'reduced'; else delete root.dataset.motion;
 
-  const meta = document.querySelector('meta[name="theme-color"]');
-  if (meta) meta.setAttribute('content', root.dataset.theme === 'dark' ? '#0f1116' : '#ffffff');
+  applyThemeColor();
 
   const btn = document.getElementById('btn-theme');
   if (btn) {
@@ -55,13 +54,37 @@ export function applyAppearance(settings) {
   }
 }
 
+/**
+ * iOS paints the status bar / Dynamic Island area and Safari's chrome with
+ * `theme-color`. Hard-coding it meant a white bar above an off-white page, so
+ * read the live --c-bg token instead and the bar can never drift from the
+ * background it sits against.
+ */
+export function applyThemeColor() {
+  const root = document.documentElement;
+  const token = getComputedStyle(root).getPropertyValue('--c-bg').trim();
+  if (!token) return;
+  // A custom property computes to its raw text ("hsl(240 20% 97%)"), which the
+  // meta will not take. Round-trip it through a real colour declaration.
+  const probe = document.createElement('span');
+  probe.style.cssText = 'position:absolute;visibility:hidden;color:' + token;
+  (document.body || root).appendChild(probe);
+  const rgb = getComputedStyle(probe).color;
+  probe.remove();
+  if (!rgb) return;
+  document.querySelectorAll('meta[name="theme-color"]')
+    .forEach((m) => m.setAttribute('content', rgb));
+}
+
 export const THEME_LABEL = { system: 'Match my device', light: 'Light', dark: 'Dark' };
 
 /** Keep "system" in step with the OS while the app is open. */
 export function watchSystemTheme() {
   if (!media) return;
   const onChange = () => {
-    if (currentPreference === 'system') document.documentElement.dataset.theme = resolve('system');
+    if (currentPreference !== 'system') return;
+    document.documentElement.dataset.theme = resolve('system');
+    applyThemeColor();        // the bar has to follow the page across the flip
   };
   if (media.addEventListener) media.addEventListener('change', onChange);
   else if (media.addListener) media.addListener(onChange);

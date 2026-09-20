@@ -6,8 +6,12 @@
 <title>StudyLab — Flashcards, Learn &amp; Test</title>
 <meta name="description" content="A fast, private, offline-first study app with Flashcards, Learn, Test and Match modes. Your sets stay in your browser.">
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
-<meta name="theme-color" content="#0f1116" media="(prefers-color-scheme: dark)">
+<!-- Seeded with the two --c-bg values so the bar is right before any script
+     runs; theme.js then keeps it in step with the in-app theme, which the
+     media queries below cannot see. -->
+<meta name="theme-color" content="#f6f6f9" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#13151b" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f6f9">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%235b5bd6'/%3E%3Crect x='14' y='18' width='30' height='22' rx='4' fill='%23fff' opacity='.55'/%3E%3Crect x='20' y='24' width='30' height='22' rx='4' fill='%23fff'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/modes.css">
