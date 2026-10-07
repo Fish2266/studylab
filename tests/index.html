@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<meta charset="utf-8">
+<title>StudyLab tests</title>
+<style>
+  body { font: 14px/1.5 system-ui, sans-serif; margin: 24px; max-width: 860px; }
+  .pass { color: #1a7f4b; } .fail { color: #c62828; font-weight: 600; }
+  pre { background: #f4f4f6; padding: 8px; white-space: pre-wrap; }
+  #summary { font-size: 18px; font-weight: 700; margin-bottom: 12px; }
+</style>
+<div id="summary">Running…</div>
+<ol id="out"></ol>
+<script type="module">
+/* Browser test suite. Open /tests/ on any local server (or the live site).
+   Pure logic only — it never touches your saved sets. */
+const out = document.getElementById('out');
+const results = [];
+function test(name, fn) { results.push({ name, fn }); }
+const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg || ''} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); };
+const ok = (v, msg) => { if (!v) throw new Error(msg || 'expected truthy'); };
+
+const MODULES = ['utils','ui','data','storage','router','theme','grading','scheduler','speech','importers','share',
+  'views/library','views/setview','views/editor','views/flashcards','views/learn','views/test','views/match',
+  'views/importview','views/settings','views/shared','views/dialogs','views/options'];
+
+test('every module loads', async () => {
+  const fails = [];
+  for (const m of MODULES) { try { await import(`../js/${m}.js`); } catch (e) { fails.push(`${m}: ${e.message}`); } }
+  eq(fails, [], 'module failures:');
+});
+
+test('service worker precaches only files that exist', async () => {
+  const sw = await (await fetch('../sw.js', { cache: 'no-store' })).text();
+  const files = [...sw.matchAll(/'([^']+\.(?:js|css|html))'/g)].map(m => m[1]);
+  ok(files.length > 20, 'shell list looks empty');
+  const missing = [];
+  for (const f of files) { const r = await fetch('../' + f, { cache: 'no-store' }); if (!r.ok) missing.push(f); }
+  eq(missing, []);
+});
+
+test('grading: smart matching', async () => {
+  const { grade } = await import('../js/grading.js');
+  const r = (u, e, o) => { const x = grade(u, e, o || {}); return x.correct ? 'correct' : x.close ? 'close' : 'wrong'; };
+  eq(r('the Mitochondria', 'mitochondria'), 'correct');
+  eq(r('cafe', 'café'), 'correct');
+  eq(r('its a test', "It's a test"), 'correct');
+  eq(r('kitty', 'cat / kitty'), 'correct');
+  eq(r('run', '(to) run'), 'correct');
+  eq(r('measures fitness difference between a genotype and most fit genotype',
+       'measures fitness difference between a genotype and the most fit genotype'), 'correct', 'mid-sentence article');
+  eq(r('mitochondrian', 'mitochondrion'), 'close');
+  eq(r('measures how big a population is', 'measures fitness difference between a genotype and the most fit genotype'), 'wrong', 'long wrong answer must not be close');
+  eq(r('dog', 'cat'), 'wrong');
+  eq(r('', 'x'), 'wrong');
+  eq(r('cafe', 'café', { requireExact: true }), 'wrong');
+  eq(r('my own words', 'official definition text here', { accepted: ['my own words'] }), 'correct', 'remembered override');
+});
+
+test('distractors never leak the answer or repeat', async () => {
+  const { distractors } = await import('../js/grading.js');
+  const pool = Array.from({ length: 500 }, (_, i) => `definition ${i}`);
+  for (let i = 0; i < 200; i++) {
+    const d = distractors(pool[i], pool, 3);
+    eq(d.length, 3); ok(!d.includes(pool[i]), 'leaked answer'); eq(new Set(d).size, 3, 'duplicate');
+  }
+});
+
+test('scheduler: override path reaches mastery', async () => {
+  const { recordAnswer } = await import('../js/scheduler.js');
+  const p = { cards: {} }, o = { masteryTarget: 2 };
+  recordAnswer(p, 't', true, o);                          // streak 1
+  const before = { ...p.cards.t };
+  recordAnswer(p, 't', false, o);                         // a miss resets…
+  eq(p.cards.t.streak, 0);
+  p.cards.t = { ...before };                              // …"I was right" rolls back
+  recordAnswer(p, 't', true, o);
+  eq(p.cards.t.status, 'mastered');
+});
+
+test('importers: real-world formats', async () => {
+  const { parseAny } = await import('../js/importers.js');
+  eq(parseAny('a\tone\nb\ttwo').terms.length, 2, 'quizlet tsv');
+  eq(parseAny('"Hello" there\tgreeting').terms[0].term, '"Hello" there', 'quotes literal in tsv');
+  eq(parseAny('"Smith, John","A, person"').terms[0].definition, 'A, person', 'quoted csv');
+  eq(parseAny('<b>Hund</b>\tdog').terms[0].term, 'Hund', 'anki html');
+  eq(parseAny('| T | D |\n|---|---|\n| x | 1 |', { skipHeader: true }).terms[0].definition, '1', 'markdown');
+  eq(parseAny('{"cards":[{"front":"f","back":"b"}]}').terms[0].definition, 'b', 'json');
+  eq(parseAny('cat - pet\ndog - pet\nbird - wings').terms.length, 3, 'dash list');
+});
+
+test('share links round-trip', async () => {
+  const { makeShareLink, readShareLink } = await import('../js/share.js');
+  const set = { title: 'Café', description: '', terms: [{ term: 'é', definition: 'x, "y"', hint: 'h' }] };
+  const { url } = await makeShareLink(set);
+  const back = await readShareLink(url.split('#/s/')[1]);
+  eq([back.title, back.terms[0].term, back.terms[0].definition, back.terms[0].hint], ['Café', 'é', 'x, "y"', 'h']);
+});
+
+test('user text is never rendered as markup', async () => {
+  const { el } = await import('../js/utils.js');
+  window.__xss = 0;
+  const n = el('div', {}, '<img src=x onerror="window.__xss=1">');
+  document.body.appendChild(n); await new Promise(r => setTimeout(r, 50)); n.remove();
+  eq(window.__xss, 0); eq(n.children.length, 0);
+});
+
+let passed = 0;
+for (const t of results) {
+  const li = document.createElement('li');
+  try { await t.fn(); li.className = 'pass'; li.textContent = '✓ ' + t.name; passed++; }
+  catch (e) { li.className = 'fail'; li.textContent = '✗ ' + t.name; const pre = document.createElement('pre'); pre.textContent = e.message; li.appendChild(pre); }
+  out.appendChild(li);
+}
+const s = document.getElementById('summary');
+s.textContent = `${passed} / ${results.length} passed`;
+s.className = passed === results.length ? 'pass' : 'fail';
+window.__testResult = { passed, total: results.length };
+</script>

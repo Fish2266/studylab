@@ -1,0 +1,6 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    { "name": "studylab", "runtimeExecutable": "python3", "runtimeArgs": ["tools/devserver.py", "8780"], "port": 8780 }
+  ]
+}
