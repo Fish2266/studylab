@@ -52,7 +52,11 @@ export function normalize(text, opts = {}) {
   s = s.replace(/['`´]/g, '');
   s = s.replace(/[.,;:!?¿¡"()[\]{}<>«»…*_~#]/g, ' ');
   s = s.replace(/\s+/g, ' ').trim();
-  if (opts.ignoreArticles !== false) s = s.replace(ARTICLES, '');
+  if (opts.ignoreArticles !== false) {
+    s = s.replace(ARTICLES, '');
+    // Mid-sentence articles too: "and the most fit" ≡ "and most fit".
+    s = s.replace(/ (?:the|a|an) /g, ' ').replace(/\s+/g, ' ').trim();
+  }
   return s;
 }
 
@@ -93,21 +97,28 @@ export function grade(userAnswer, expected, opts = {}) {
   if (!user) return result;
 
   const variants = level === 'smart' ? acceptedVariants(expected, gopts) : [normalize(expected, gopts)];
+  // Answers the learner previously overrode as correct for this term.
+  for (const a of opts.accepted || []) variants.push(normalize(a, gopts));
   for (const v of variants) {
     if (!v) continue;
     if (v === user) return { ...result, correct: true, distance: 0 };
   }
   if (level !== 'smart') return result;
 
+  // Long answers get proportionally more slack: one slip in a 70-character
+  // definition should not count the same as one in a 5-letter word.
+  const target = variants[0] || '';
+  const tolerance = target.length <= 9 ? 1 : target.length <= 16 ? 2 : Math.max(3, Math.round(target.length * 0.08));
+
+  // The distance search stops at tolerance + 1, so "too far" can never be
+  // mistaken for "within tolerance".
   let best = Infinity;
   for (const v of variants) {
     if (!v) continue;
-    const d = editDistance(user, v, 4);
+    const d = editDistance(user, v, tolerance);
     if (d < best) best = d;
   }
   result.distance = best;
-  const target = variants[0] || '';
-  const tolerance = target.length <= 4 ? 1 : target.length <= 9 ? 1 : target.length <= 16 ? 2 : 3;
   result.close = best <= tolerance;
   return result;
 }

@@ -296,12 +296,15 @@ function start(host, set, progress, session) {
       const g = grade(given, q.answerText, {
         requireExact: opts.requireExact,
         smart: opts.smartGrading,
+        accepted: (progress.cards[q.term.id] || {}).accepted,
       });
       correct = g.correct;
       close = !g.correct && g.close;
       if (close && opts.acceptTypos) correct = true;
     }
 
+    // Snapshot first, so "I was right" can undo this answer completely.
+    q.before = { ...ensureCard(progress, q.term.id) };
     const card = recordAnswer(progress, q.term.id, correct, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
     if (correct) roundStats.right++; else roundStats.wrong++;
     saveProgressSoon();
@@ -384,10 +387,14 @@ function start(host, set, progress, session) {
       if (b) b.lastChild.textContent = q.term.starred ? 'Starred' : 'Star this';
     }
     function override() {
-      // Undo the wrong answer and credit it instead.
-      const c = progress.cards[q.term.id];
-      if (c) { c.wrong = Math.max(0, c.wrong - 1); c.seen = Math.max(0, c.seen - 1); }
-      recordAnswer(progress, q.term.id, true, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+      // Roll the card back to before the miss — streak and box included — then
+      // record a correct answer. Previously the miss had already reset the
+      // streak, so an override could never lead to mastery.
+      if (q.before) progress.cards[q.term.id] = { ...q.before };
+      const c = recordAnswer(progress, q.term.id, true, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+      // Accept this exact wording for this term from now on.
+      const typed = given.trim();
+      if (typed) c.accepted = [...new Set([...(c.accepted || []), typed])].slice(-5);
       roundStats.wrong = Math.max(0, roundStats.wrong - 1);
       roundStats.right++;
       const at = round.lastIndexOf(q.term);
