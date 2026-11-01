@@ -34,6 +34,22 @@ export function recordAnswer(progress, termId, correct, { masteryTarget = 2, pen
   return c;
 }
 
+/**
+ * "I was right": turn an answer that was graded wrong into a correct one.
+ * `before` is the card snapshot taken just before the miss was recorded; the
+ * card is rolled back to it (streak and box included) and a correct answer is
+ * recorded instead, so an override can still lead to mastery. The typed
+ * wording is remembered in `card.accepted` so it is marked right next time.
+ * Used by Learn and by the Test results page.
+ */
+export function overrideAsCorrect(progress, termId, before, typed, opts = {}) {
+  if (before) progress.cards[termId] = { ...before };
+  const c = recordAnswer(progress, termId, true, opts);
+  const t = String(typed ?? '').trim();
+  if (t) c.accepted = [...new Set([...(c.accepted || []), t])].slice(-5);
+  return c;
+}
+
 /** Lower score = study sooner. */
 function urgency(card, now) {
   if (!card || card.status === 'new') return -1000;                 // brand new first

@@ -76,6 +76,72 @@ test('scheduler: override path reaches mastery', async () => {
   eq(p.cards.t.status, 'mastered');
 });
 
+test('scheduler: overrideAsCorrect rolls back the miss and remembers the wording', async () => {
+  const { recordAnswer, ensureCard, overrideAsCorrect } = await import('../js/scheduler.js');
+  const { grade } = await import('../js/grading.js');
+  const p = { cards: {} }, o = { masteryTarget: 2 };
+  recordAnswer(p, 't', true, o);
+  const before = { ...ensureCard(p, 't') };
+  recordAnswer(p, 't', false, o);
+  const c = overrideAsCorrect(p, 't', before, '  energy factory of the cell ', o);
+  eq([c.status, c.wrong, c.right], ['mastered', 0, 2]);
+  eq(c.accepted, ['energy factory of the cell']);
+  ok(grade('Energy factory of the cell', 'the powerhouse of the cell', { accepted: c.accepted }).correct, 'wording accepted next time');
+  ok(grade('energy factory of the cell', 'the powerhouse of the cell', { requireExact: true, accepted: c.accepted }).correct, 'even with smart grading off');
+});
+
+test('test paper only uses the question types you turned on', async () => {
+  const { makeQuestions } = await import('../js/views/test.js');
+  const { mulberry32 } = await import('../js/utils.js');
+  const terms = n => Array.from({ length: n }, (_, i) => ({ id: 't' + i, term: 'term ' + i, definition: 'definition ' + i }));
+  const kindsOf = qs => [...new Set(qs.map(q => q.kind))].sort();
+  const covered = qs => qs.reduce((n, q) => n + (q.kind === 'matching' ? q.terms.length : 1), 0);
+  const all = ['written', 'multiple', 'truefalse', 'matching'];
+  // every non-empty combination of types, several set sizes and seeds
+  for (let mask = 1; mask < 16; mask++) {
+    const types = Object.fromEntries(all.map((k, b) => [k, !!(mask & (1 << b))]));
+    const on = all.filter(k => types[k]);
+    for (const n of [2, 3, 4, 7, 12, 23]) {
+      for (let seed = 1; seed <= 6; seed++) {
+        const t = terms(n);
+        const qs = makeQuestions(t, t, { types, answerWith: 'both' }, mulberry32(seed));
+        eq(covered(qs), n, `every term asked once (${on}, n=${n})`);
+        const stray = kindsOf(qs).filter(k => !on.includes(k));
+        eq(stray, [], `types ${on} on, n=${n}, seed=${seed}:`);
+      }
+    }
+  }
+  // matching only: no written leftovers, groups balanced and never above five
+  const sizes = n => makeQuestions(terms(n), terms(n), { types: { matching: true } }, mulberry32(1)).map(q => q.terms.length);
+  eq(sizes(12), [4, 4, 4]); eq(sizes(7), [4, 3]); eq(sizes(5), [5]); eq(sizes(3), [3]);
+  // turning matching on in a big set actually produces matching questions
+  const t = terms(30);
+  const mixed = makeQuestions(t, t, { types: { written: true, matching: true } }, mulberry32(3));
+  ok(mixed.some(q => q.kind === 'matching'), 'matching appears when enabled');
+});
+
+test('tapping the words of a switch row flips the switch', async () => {
+  const { checkboxRow, typeRows } = await import('../js/views/options.js');
+  let v = false;
+  const row = checkboxRow('Starred only', '', false, x => { v = x; });
+  document.body.appendChild(row);
+  row.querySelector('.opt-row__label').click();
+  eq([v, row.querySelector('input').checked], [true, true]);
+  row.querySelector('input').click();                 // the switch itself still works, once
+  eq([v, row.querySelector('input').checked], [false, false]);
+  row.remove();
+  // "keep at least one type on" still applies when tapping the words
+  let types = { written: true, matching: false };
+  const rows = typeRows(types, [['written', 'Written'], ['matching', 'Matching']], x => { types = x; });
+  rows.forEach(r => document.body.appendChild(r));
+  rows[0].querySelector('.opt-row__label').click();
+  ok(rows[0].querySelector('input').checked, 'last type cannot be turned off');
+  rows[1].querySelector('.opt-row__text').click();
+  rows[0].querySelector('.opt-row__label').click();
+  eq(types, { written: false, matching: true });
+  rows.forEach(r => r.remove());
+});
+
 test('importers: real-world formats', async () => {
   const { parseAny } = await import('../js/importers.js');
   eq(parseAny('a\tone\nb\ttwo').terms.length, 2, 'quizlet tsv');

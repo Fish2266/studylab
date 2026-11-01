@@ -183,12 +183,22 @@ export function switchToggle(checked, onChange, labelId) {
 }
 export function optionRow({ label, sub, control }) {
   const id = uid('or');
-  return el('div', { class: 'opt-row' },
+  const ctl = el('div', { class: 'opt-row__ctl' }, typeof control === 'function' ? control(id) : control);
+  const row = el('div', { class: 'opt-row' },
     el('div', { class: 'opt-row__text' },
       el('div', { class: 'opt-row__label', id }, label),
       sub ? el('div', { class: 'opt-row__sub' }, sub) : null),
-    el('div', { class: 'opt-row__ctl' }, typeof control === 'function' ? control(id) : control),
+    ctl,
   );
+  // A switch is only 44px wide; on a phone people tap the words. Let a tap
+  // anywhere on a switch row flip it (through the input, so any onChange
+  // logic — e.g. "keep at least one type on" — still runs).
+  const box = ctl.querySelector('.switch input[type="checkbox"]');
+  if (box) {
+    row.classList.add('opt-row--toggle');
+    row.addEventListener('click', (e) => { if (!ctl.contains(e.target)) box.click(); });
+  }
+  return row;
 }
 export function segmented(options, value, onChange, ariaLabel) {
   const wrap = el('div', { class: 'segment', role: 'group', 'aria-label': ariaLabel || '' });

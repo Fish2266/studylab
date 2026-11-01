@@ -10,7 +10,7 @@ import * as data from '../data.js';
 import { toast, confirmDialog, segBar } from '../ui.js';
 import { navigate } from '../router.js';
 import { grade, distractors } from '../grading.js';
-import { buildRound, questionKindFor, recordAnswer, ensureCard } from '../scheduler.js';
+import { buildRound, questionKindFor, recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
 import * as speech from '../speech.js';
 import { openOptions, optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
@@ -361,7 +361,9 @@ function start(host, set, progress, session) {
         !correct && given ? el('div', {}, el('span', { class: 'strike' }, given)) : null,
         el('div', { class: 'verdict__ans' }, el('strong', {}, 'Answer: '), q.answerText || '(empty)'),
         el('div', { class: 'verdict__actions' },
-          canOverride ? el('button', { class: 'btn btn--sm', type: 'button', onclick: override }, 'I was right (O)') : null,
+          canOverride ? el('button', { class: 'btn btn--sm btn--override', type: 'button', onclick: override,
+            title: 'Count this answer as correct and accept this wording next time (O)', 'aria-keyshortcuts': 'O' },
+            icon('check'), 'I was right') : null,
           speech.supported ? el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: () => speech.speak(q.answerText, { lang: q.answerLang }) }, icon('sound'), 'Hear it') : null,
           el('button', { class: 'btn btn--sm', type: 'button', onclick: star }, icon('star'), q.term.starred ? 'Starred' : 'Star this'),
         ),
@@ -390,11 +392,8 @@ function start(host, set, progress, session) {
       // Roll the card back to before the miss — streak and box included — then
       // record a correct answer. Previously the miss had already reset the
       // streak, so an override could never lead to mastery.
-      if (q.before) progress.cards[q.term.id] = { ...q.before };
-      const c = recordAnswer(progress, q.term.id, true, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
-      // Accept this exact wording for this term from now on.
-      const typed = given.trim();
-      if (typed) c.accepted = [...new Set([...(c.accepted || []), typed])].slice(-5);
+      // The typed wording is accepted for this term from now on.
+      overrideAsCorrect(progress, q.term.id, q.before, given, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
       roundStats.wrong = Math.max(0, roundStats.wrong - 1);
       roundStats.right++;
       const at = round.lastIndexOf(q.term);

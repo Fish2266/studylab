@@ -141,6 +141,8 @@
 .verdict__h { font-weight: 660; margin-bottom: 2px; }
 .verdict__ans { font-family: var(--font-read); }
 .verdict__actions { display: flex; align-items: center; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn--override { color: var(--c-good); border-color: var(--c-good-line); }
+.verdict__note { font-size: .8rem; color: var(--c-text-dim); margin-top: 4px; }
 .strike { text-decoration: line-through; color: var(--c-text-dim); }
 
 .q-foot { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap;
@@ -219,6 +221,7 @@
 .opt-row__text { flex: 1 1 200px; min-width: 0; }
 .opt-row__label { font-weight: 600; font-size: .92rem; line-height: 1.35; }
 .opt-row__sub { font-size: .8rem; color: var(--c-text-dim); margin-top: 1px; line-height: 1.4; }
+.opt-row--toggle { cursor: pointer; }
 .opt-row__ctl { flex: none; display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-width: 150px; }
 .opt-row__ctl .select, .opt-row__ctl .input { width: auto; min-width: 128px; }
 @media (max-width: 520px) { .opt-row__ctl { min-width: 0; flex: 1; } }

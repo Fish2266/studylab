@@ -3,12 +3,12 @@
  * Questions are generated once from a seeded shuffle, so "retake this test"
  * reproduces the same paper while "new test" draws fresh questions.
  */
-import { el, icon, shuffle, mulberry32, isTyping, plural, mmss, announce, clamp } from '../utils.js';
+import { el, setChildren, icon, shuffle, mulberry32, isTyping, plural, mmss, announce, clamp } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog } from '../ui.js';
 import { navigate } from '../router.js';
 import { grade, distractors } from '../grading.js';
-import { recordAnswer } from '../scheduler.js';
+import { recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
 import { optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
 const LETTERS = 'ABCDEFGHIJ';
@@ -94,7 +94,7 @@ function controller(host, set, progress, session) {
           ['written', 'Written', 'Type the answer'],
           ['multiple', 'Multiple choice', 'Four options'],
           ['truefalse', 'True or false', 'Judge a proposed answer'],
-          ['matching', 'Matching', 'Pair five terms with five definitions'],
+          ['matching', 'Matching', 'Pair up to five terms with their definitions'],
         ], v => { d.types = v; }),
       ]),
       optionGroup('Which terms', [
@@ -124,57 +124,10 @@ function controller(host, set, progress, session) {
 
     const count = clamp(opts.questionCount, 1, pool.length);
     const chosen = opts.shuffle ? shuffle(pool, rng).slice(0, count) : pool.slice(0, count);
-
-    const kinds = Object.entries(opts.types).filter(([, on]) => on).map(([k]) => k);
-    const canMatch = kinds.includes('matching') && pool.length >= MATCH_GROUP && chosen.length >= MATCH_GROUP;
-    const questions = [];
-    let i = 0;
-
-    // Built once instead of per question: on a 2,000-term set rebuilding these
-    // inside the loop was the difference between instant and a visible stall.
-    const allDefs = pool.map(t => t.definition).filter(Boolean);
-    const allTerms = pool.map(t => t.term).filter(Boolean);
-
-    while (i < chosen.length) {
-      let kind = kinds.length ? kinds[Math.floor(rng() * kinds.length)] : 'written';
-      if (kind === 'matching' && (!canMatch || chosen.length - i < MATCH_GROUP)) {
-        const others = kinds.filter(k => k !== 'matching');
-        kind = others.length ? others[Math.floor(rng() * others.length)] : 'written';
-      }
-      if (kind === 'matching') {
-        const group = chosen.slice(i, i + MATCH_GROUP);
-        i += MATCH_GROUP;
-        const dir = pickDir(rng);
-        questions.push({
-          id: `q${questions.length}`, kind: 'matching', dir, terms: group,
-          prompts: shuffle(group, rng),
-          options: shuffle(group, rng),
-        });
-        continue;
-      }
-      const term = chosen[i++];
-      const dir = pickDir(rng);
-      const promptText = dir === 'definition' ? term.term : term.definition;
-      const answerText = dir === 'definition' ? term.definition : term.term;
-      const others = dir === 'definition' ? allDefs : allTerms;   // may include the answer; distractors filters it out
-      const base = { id: `q${questions.length}`, term, dir, promptText, answerText };
-
-      if (kind === 'multiple') {
-        const wrong = distractors(answerText, others, 3, rng);
-        if (!wrong.length) { questions.push({ ...base, kind: 'written' }); continue; }
-        questions.push({ ...base, kind: 'multiple', choices: shuffle([answerText, ...wrong], rng) });
-      } else if (kind === 'truefalse') {
-        const showCorrect = rng() < 0.5 || !others.length;
-        const shown = showCorrect ? answerText : (distractors(answerText, others, 1, rng)[0] || answerText);
-        questions.push({ ...base, kind: 'truefalse', shown, expectTrue: shown === answerText });
-      } else {
-        questions.push({ ...base, kind: 'written' });
-      }
-    }
+    const questions = makeQuestions(chosen, pool, opts, rng);
     paper = { questions, seed };
     answers = new Map();
     graded = false;
-    function pickDir(r) { return opts.answerWith === 'both' ? (r() < 0.5 ? 'definition' : 'term') : opts.answerWith; }
   }
 
   /* ---------------- sitting the test ---------------- */
@@ -377,7 +330,10 @@ function controller(host, set, progress, session) {
       const correct = given === q.expectTrue;
       return { correct, given: given === undefined ? '' : (given ? 'True' : 'False'), total: 1, correctCount: correct ? 1 : 0 };
     }
-    const g = grade(given ?? '', q.answerText, { requireExact: !opts.smartGrading, smart: opts.smartGrading });
+    const g = grade(given ?? '', q.answerText, {
+      requireExact: !opts.smartGrading, smart: opts.smartGrading,
+      accepted: (progress.cards[q.term.id] || {}).accepted,     // wordings you marked right before
+    });
     return { correct: g.correct, close: g.close, given: given ?? '', total: 1, correctCount: g.correct ? 1 : 0 };
   }
 
@@ -421,37 +377,72 @@ function controller(host, set, progress, session) {
 
     // Feed the result back into the set's overall progress.
     for (const { q, r } of perQuestion) {
-      if (q.kind === 'matching') r.results.forEach(x => recordAnswer(progress, x.term.id, x.correct, { masteryTarget: data.getSettings().learn.masteryTarget }));
-      else recordAnswer(progress, q.term.id, !!r.correct, { masteryTarget: data.getSettings().learn.masteryTarget });
+      if (q.kind === 'matching') r.results.forEach(x => recordAnswer(progress, x.term.id, x.correct, { masteryTarget: masteryTarget() }));
+      else {
+        q.before = { ...ensureCard(progress, q.term.id) };     // so "I was right" can undo the miss
+        recordAnswer(progress, q.term.id, !!r.correct, { masteryTarget: masteryTarget() });
+      }
     }
     data.saveProgress(progress).catch(err => toast(`Could not save progress: ${err.message}`, { type: 'bad' }));
 
-    paintResults(perQuestion, right, total);
+    paintResults(perQuestion);
   }
+  function masteryTarget() { return data.getSettings().learn.masteryTarget; }
 
-  function paintResults(perQuestion, right, total) {
-    const pct = total ? Math.round((right / total) * 100) : 0;
-    const wrongTerms = [];
-    for (const { q, r } of perQuestion) {
-      if (q.kind === 'matching') r.results.filter(x => !x.correct).forEach(x => wrongTerms.push(x.term));
-      else if (!r.correct) wrongTerms.push(q.term);
-    }
+  function paintResults(perQuestion) {
+    const summary = el('div', { class: 'card card__pad test-score', style: { marginBottom: '18px' } });
+    const paintSummary = () => {
+      let right = 0, total = 0, overridden = 0;
+      const wrongTerms = [];
+      for (const { q, r } of perQuestion) {
+        right += r.correctCount;
+        total += r.total;
+        if (r.overridden) overridden++;
+        if (q.kind === 'matching') r.results.filter(x => !x.correct).forEach(x => wrongTerms.push(x.term));
+        else if (!r.correct) wrongTerms.push(q.term);
+      }
+      const pct = total ? Math.round((right / total) * 100) : 0;
+      const scoreColor = pct >= 80 ? 'var(--c-good)' : pct >= 60 ? 'var(--c-warn)' : 'var(--c-bad)';
+      setChildren(summary,
+        el('div', { class: 'test-score__big', style: { color: scoreColor } }, `${pct}%`),
+        el('div', { class: 'test-score__sub' }, `${right} of ${total} correct`),
+        overridden ? el('div', { class: 'field__hint' }, `Includes ${plural(overridden, 'answer')} you marked correct`) : null,
+        el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '20px' } },
+          wrongTerms.length ? el('a', { class: 'btn btn--primary', href: `#/set/${set.id}/learn` }, icon('brain'), `Study the ${wrongTerms.length} you missed`) : null,
+          el('button', { class: 'btn', type: 'button', onclick: () => { buildPaper(paper.seed); paintPaper(); window.scrollTo({ top: 0 }); } }, icon('undo'), 'Retake this test'),
+          el('button', { class: 'btn', type: 'button', onclick: () => { buildPaper(); paintPaper(); window.scrollTo({ top: 0 }); } }, icon('shuffle'), 'New test'),
+          el('button', { class: 'btn btn--ghost', type: 'button', onclick: paintSetup }, 'Change options'),
+        ));
+      return { pct, right, total };
+    };
 
-    const scoreColor = pct >= 80 ? 'var(--c-good)' : pct >= 60 ? 'var(--c-warn)' : 'var(--c-bad)';
-    const summary = el('div', { class: 'card card__pad test-score', style: { marginBottom: '18px' } },
-      el('div', { class: 'test-score__big', style: { color: scoreColor } }, `${pct}%`),
-      el('div', { class: 'test-score__sub' }, `${right} of ${total} correct`),
-      el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '20px' } },
-        wrongTerms.length ? el('a', { class: 'btn btn--primary', href: `#/set/${set.id}/learn` }, icon('brain'), `Study the ${wrongTerms.length} you missed`) : null,
-        el('button', { class: 'btn', type: 'button', onclick: () => { buildPaper(paper.seed); paintPaper(); window.scrollTo({ top: 0 }); } }, icon('undo'), 'Retake this test'),
-        el('button', { class: 'btn', type: 'button', onclick: () => { buildPaper(); paintPaper(); window.scrollTo({ top: 0 }); } }, icon('shuffle'), 'New test'),
-        el('button', { class: 'btn btn--ghost', type: 'button', onclick: paintSetup }, 'Change options'),
-      ));
+    // "I was right": flip a written answer to correct after the fact (e.g. the
+    // definition in your own words). Undoable, since it is easy to mis-tap.
+    const setOverride = (entry, on) => {
+      const { q, r } = entry;
+      if (on) {
+        r.afterMiss = { ...progress.cards[q.term.id] };
+        overrideAsCorrect(progress, q.term.id, q.before, r.given, { masteryTarget: masteryTarget() });
+      } else if (r.afterMiss) {
+        progress.cards[q.term.id] = { ...r.afterMiss };
+      }
+      r.overridden = on;
+      r.correct = on;
+      r.correctCount = on ? 1 : 0;
+      data.saveProgress(progress).catch(err => toast(`Could not save progress: ${err.message}`, { type: 'bad' }));
+      const old = cards[perQuestion.indexOf(entry)];
+      const fresh = reviewCard(entry, perQuestion.indexOf(entry), setOverride);
+      old.replaceWith(fresh);
+      cards[perQuestion.indexOf(entry)] = fresh;
+      const { pct } = paintSummary();
+      announce(on ? `Marked correct. Score now ${pct} percent.` : `Back to incorrect. Score now ${pct} percent.`);
+      fresh.querySelector('.verdict__actions .btn')?.focus({ preventScroll: true });
+    };
 
-    const review = el('div', {});
-    perQuestion.forEach(({ q, r }, n) => review.appendChild(reviewCard(q, r, n)));
+    const { pct, right, total } = paintSummary();
+    const cards = perQuestion.map((entry, n) => reviewCard(entry, n, setOverride));
 
-    stage.replaceChildren(summary, el('h2', { style: { margin: '10px 0 12px' } }, 'Review'), review,
+    stage.replaceChildren(summary, el('h2', { style: { margin: '10px 0 12px' } }, 'Review'), el('div', {}, ...cards),
       el('div', { class: 'sticky-bar' },
         el('a', { class: 'btn', href: `#/set/${set.id}` }, 'Back to set'),
         el('div', { style: { flex: '1' } }),
@@ -461,13 +452,14 @@ function controller(host, set, progress, session) {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
-  function reviewCard(q, r, n) {
+  function reviewCard(entry, n, setOverride) {
+    const { q, r } = entry;
     const allRight = r.correctCount === r.total;
     const card = el('div', { class: `test-q ${allRight ? 'is-correct' : 'is-wrong'}` },
       el('div', { class: 'test-q__n' },
         el('span', {}, q.kind === 'matching' ? `Matching set ${n + 1}` : `Question ${n + 1}`),
         el('span', { class: `chip ${allRight ? 'chip--good' : 'chip--bad'}` },
-          allRight ? 'Correct' : r.total > 1 ? `${r.correctCount} of ${r.total}` : 'Incorrect')));
+          r.overridden ? 'Marked correct' : allRight ? 'Correct' : r.total > 1 ? `${r.correctCount} of ${r.total}` : 'Incorrect')));
 
     if (q.kind === 'matching') {
       r.results.forEach(x => {
@@ -485,13 +477,23 @@ function controller(host, set, progress, session) {
     card.appendChild(el('div', { class: 'q-prompt is-long', style: { marginBottom: '10px' } }, q.promptText));
     if (q.kind === 'truefalse') card.appendChild(el('p', { class: 'field__hint' }, `Proposed: ${q.shown}`));
     const givenText = r.given === '' ? '(blank)' : String(r.given);
+    // Only typed answers can be "right in other words"; choices are objective.
+    const canOverride = q.kind === 'written' && String(r.given).trim() !== '' && (!allRight || r.overridden);
     card.appendChild(el('div', { class: `verdict verdict--${allRight ? 'good' : 'bad'}` },
       el('span', { class: 'verdict__icon' }, icon(allRight ? 'check' : 'x')),
       el('div', { class: 'verdict__body' },
-        el('div', { class: 'verdict__h' }, allRight ? 'Correct' : 'Incorrect'),
-        allRight ? null : el('div', {}, 'You answered ', el('span', { class: 'strike' }, givenText)),
+        el('div', { class: 'verdict__h' }, r.overridden ? 'Marked correct' : allRight ? 'Correct' : 'Incorrect'),
+        r.overridden ? el('div', {}, 'You answered ', el('strong', {}, givenText))
+          : allRight ? null : el('div', {}, 'You answered ', el('span', { class: 'strike' }, givenText)),
         el('div', { class: 'verdict__ans' }, el('strong', {}, 'Answer: '), q.kind === 'truefalse' ? (q.expectTrue ? 'True' : 'False') : q.answerText),
         q.kind === 'truefalse' && !q.expectTrue ? el('div', { class: 'field__hint' }, `Correct answer: ${q.answerText}`) : null,
+        r.overridden ? el('div', { class: 'verdict__note' }, 'This wording will be accepted for this term from now on.') : null,
+        canOverride ? el('div', { class: 'verdict__actions' },
+          r.overridden
+            ? el('button', { class: 'btn btn--sm', type: 'button', onclick: () => setOverride(entry, false) }, icon('undo'), 'Undo')
+            : el('button', { class: 'btn btn--sm btn--override', type: 'button', onclick: () => setOverride(entry, true),
+                title: 'Count this answer as correct and accept this wording next time' }, icon('check'), 'I was right'),
+        ) : null,
       )));
     return card;
   }
@@ -508,4 +510,86 @@ function controller(host, set, progress, session) {
   document.addEventListener('keydown', session.keyHandler);
 
   paintSetup();
+}
+
+/* ---------------- paper generation (pure, exported for the test page) ---------------- */
+const TYPE_KEYS = ['written', 'multiple', 'truefalse', 'matching'];
+
+/**
+ * Turn the chosen terms into questions using ONLY the enabled question types.
+ * Nothing silently becomes a written question: when Matching is the only type,
+ * every term is put into a matching group (groups are balanced, up to five
+ * pairs each), and when a group would be too small to be worth it the other
+ * enabled types are used instead. Written is the last resort only when no
+ * enabled type can be built at all (e.g. a one-term test with Matching only).
+ */
+export function makeQuestions(chosen, pool, opts, rng = Math.random) {
+  const enabled = TYPE_KEYS.filter(k => opts.types && opts.types[k]);
+  const kinds = enabled.length ? enabled : ['written'];
+  const single = kinds.filter(k => k !== 'matching');
+  const pickDir = () => opts.answerWith === 'both' ? (rng() < 0.5 ? 'definition' : 'term') : (opts.answerWith || 'definition');
+  const pick = (list) => list[Math.floor(rng() * list.length)];
+
+  // Built once instead of per question: on a 2,000-term set rebuilding these
+  // inside the loop was the difference between instant and a visible stall.
+  const allDefs = pool.map(t => t.definition).filter(Boolean);
+  const allTerms = pool.map(t => t.term).filter(Boolean);
+
+  const questions = [];
+  const addMatching = (group) => {
+    questions.push({
+      id: `q${questions.length}`, kind: 'matching', dir: pickDir(), terms: group,
+      prompts: shuffle(group, rng),
+      options: shuffle(group, rng),
+    });
+  };
+  const addSingle = (term, kind) => {
+    const dir = pickDir();
+    const promptText = dir === 'definition' ? term.term : term.definition;
+    const answerText = dir === 'definition' ? term.definition : term.term;
+    const others = dir === 'definition' ? allDefs : allTerms;   // may include the answer; distractors filters it out
+    const base = { id: `q${questions.length}`, term, dir, promptText, answerText };
+    if (kind === 'multiple') {
+      const wrong = distractors(answerText, others, 3, rng);
+      if (wrong.length) { questions.push({ ...base, kind: 'multiple', choices: shuffle([answerText, ...wrong], rng) }); return; }
+      kind = single.includes('truefalse') ? 'truefalse' : 'written';   // nothing to choose between
+    }
+    if (kind === 'truefalse') {
+      const showCorrect = rng() < 0.5 || !others.length;
+      const shown = showCorrect ? answerText : (distractors(answerText, others, 1, rng)[0] || answerText);
+      questions.push({ ...base, kind: 'truefalse', shown, expectTrue: shown === answerText });
+      return;
+    }
+    questions.push({ ...base, kind: 'written' });
+  };
+
+  // Matching only: split everything into balanced groups (12 terms -> 4+4+4,
+  // 7 -> 4+3) rather than leaving a remainder that turns into written questions.
+  if (kinds.length === 1 && kinds[0] === 'matching') {
+    if (chosen.length >= 2) {
+      const groups = Math.ceil(chosen.length / MATCH_GROUP);
+      let i = 0;
+      for (let g = 0; g < groups; g++) {
+        const size = Math.floor(chosen.length / groups) + (g < chosen.length % groups ? 1 : 0);
+        addMatching(chosen.slice(i, i + size));
+        i += size;
+      }
+    } else {
+      chosen.forEach(t => addSingle(t, 'written'));   // one term cannot be matched
+    }
+    return questions;
+  }
+
+  let i = 0;
+  while (i < chosen.length) {
+    let kind = pick(kinds);
+    if (kind === 'matching' && chosen.length - i < MATCH_GROUP) kind = pick(single);
+    if (kind === 'matching') {
+      addMatching(chosen.slice(i, i + MATCH_GROUP));
+      i += MATCH_GROUP;
+    } else {
+      addSingle(chosen[i++], kind);
+    }
+  }
+  return questions;
 }
