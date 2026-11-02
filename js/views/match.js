@@ -3,7 +3,7 @@ import { el, icon, shuffle, sample, isTyping, plural, clamp } from '../utils.js'
 import * as data from '../data.js';
 import { toast } from '../ui.js';
 import { kvGet, kvSet } from '../storage.js';
-import { createMood, snowman, hero, isEnabled as flurryOn } from '../mascot.js';
+import { createMood, snowman, hero, SIZES, isEnabled as flurryOn } from '../mascot.js';
 import { openOptions, optionGroup, numberRow, selectRow } from './options.js';
 
 const PENALTY_MS = 1000;
@@ -55,7 +55,7 @@ function start(host, set, usable, best, session) {
   // A tiny Flurry by the timer: flinches at wrong pairs, perks up at right ones.
   let flurry = createMood();
   const mini = el('span', { class: 'match-mini' });
-  const setMini = (r) => { if (flurryOn()) mini.replaceChildren(snowman({ face: r.face, melt: r.melt, size: 26 })); };
+  const setMini = (r) => { if (flurryOn()) mini.replaceChildren(snowman({ face: r.face, melt: r.melt, ...SIZES.mini() })); };
   const bestEl = el('span', { class: 'chip' });
   const board = el('div', { class: 'match-board' });
   const stage = el('div', {});

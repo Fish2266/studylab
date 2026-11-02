@@ -192,8 +192,8 @@ function start(host, set, progress, session) {
     const tally = countSorted();
     stage.replaceChildren(el('div', { class: 'round-done', style: { width: '100%' } },
       hero(opts.trackProgress && !tally.learning && tally.known
-        ? { face: 'grin', quip: 'You know every card! I’m so proud I could melt. (I won’t.)', size: 72 }
-        : { face: 'wave', wave: true, quip: tally.learning && opts.trackProgress ? 'That’s the deck! Learn mode will drill the tricky ones.' : 'That’s the whole deck. Nice!', size: 72 }),
+        ? { face: 'grin', quip: 'You know every card! I’m so proud I could melt. (I won’t.)' }
+        : { face: 'wave', wave: true, quip: tally.learning && opts.trackProgress ? 'That’s the deck! Learn mode will drill the tricky ones.' : 'That’s the whole deck. Nice!' }),
       el('h2', {}, 'You have been through every card'),
       el('p', { class: 'round-done__sub' }, opts.trackProgress
         ? `${tally.known} marked as known, ${tally.learning} still learning.`

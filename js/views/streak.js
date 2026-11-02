@@ -7,7 +7,7 @@
  */
 import { el, plural } from '../utils.js';
 import * as data from '../data.js';
-import { snowman, isEnabled as flurryOn } from '../mascot.js';
+import { snowman, SIZES, isEnabled as flurryOn } from '../mascot.js';
 
 const WEEKS = 53;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -68,7 +68,7 @@ function flurryBy(info) {
     : info.studiedToday
       ? [info.current >= 7 ? 'cool' : 'happy', 0, info.current >= 7 ? 'A week-long streak. Too cool.' : 'Done for today! I’m staying frosty.']
       : ['nervous', 1, 'Your streak is waiting… (also, this fire is VERY close to me)'];
-  const s = snowman({ face, melt, size: 38, title });
+  const s = snowman({ face, melt, title, ...SIZES.badge() });
   s.classList.add('streak__flurry');
   return s;
 }

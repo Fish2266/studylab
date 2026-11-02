@@ -415,7 +415,7 @@ function controller(host, set, progress, session) {
       setChildren(summary,
         el('div', { class: 'test-score__big', style: { color: scoreColor } }, `${pct}%`),
         el('div', { class: 'test-score__sub' }, `${right} of ${total} correct`),
-        buddy({ ...moodForScore(pct), size: 56, className: 'buddy--center buddy--score' }),
+        buddy({ ...moodForScore(pct), place: 'summary', className: 'buddy--center buddy--score' }),
         overridden ? el('div', { class: 'field__hint' }, `Includes ${plural(overridden, 'answer')} you marked correct`) : null,
         el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '20px' } },
           wrongTerms.length ? el('a', { class: 'btn btn--primary', href: `#/set/${set.id}/learn` }, icon('brain'), `Study the ${wrongTerms.length} you missed`) : null,

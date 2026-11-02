@@ -9,7 +9,7 @@
  * the cache. Study data is NOT here — that lives in IndexedDB and is never
  * cached or uploaded.
  */
-const VERSION = 'studylab-v10';
+const VERSION = 'studylab-v11';
 const SCOPE = new URL(self.registration.scope);
 
 const SHELL = [

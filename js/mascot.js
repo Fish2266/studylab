@@ -123,24 +123,65 @@ const INK = '#26232f';
 const CARROT = '#f2862e';
 const WATER = 'var(--snow-water)';
 
+/** Is this state drawn as a puddle? */
+const isPuddle = (face, m) => face === 'puddle' || m >= 7;
+
+/**
+ * The visible area for a state, cropped to what is actually drawn, so a plain
+ * snowman is not shrunk to make room for a rain cloud he does not have, and a
+ * puddle is not a thin strip at the bottom of a tall empty box.
+ */
+export function frame(face, m) {
+  const bottom = isPuddle(face, m) ? 127 : 132;
+  let top;
+  if (isPuddle(face, m)) {
+    const happy = HAPPY.has(face);
+    top = m >= 8 && !happy ? 48 : 76;                          // room for the cloud (and the help sign under it)
+  } else if (face === 'party') {
+    top = -16;
+  } else if (face === 'sob' || (SAD.has(face) && m >= 5)) {
+    const sy = 1 - m * 0.065;
+    top = Math.min(-8, Math.round(124 * (1 - sy)) - 31);       // the cloud sinks with him
+  } else {
+    top = -8;
+  }
+  return { top, height: bottom - top, width: 120 };
+}
+
 /**
  * The snowman element.
- * @param {{face?:string, melt?:number, size?:number, title?:string, wave?:boolean}} o
+ * `size` is his HEIGHT in px — so a melted Flurry spreads sideways into a
+ * proper puddle instead of shrinking — capped so he is never wider than
+ * `maxWidth`.
+ * @param {{face?:string, melt?:number, size?:number, maxWidth?:number, title?:string, wave?:boolean}} o
  */
-export function snowman({ face = 'happy', melt = 0, size = 48, title = '', wave = false } = {}) {
+export function snowman({ face = 'happy', melt = 0, size = 72, maxWidth = Infinity, title = '', wave = false } = {}) {
   const m = Math.max(0, Math.min(MAX_MELT, Math.round(melt)));
+  const f = frame(face, m);
+  let h = size, w = size * f.width / f.height;
+  if (w > maxWidth) { w = maxWidth; h = w * f.height / f.width; }
   const node = el('span', {
-    class: `snowman snowman--${face}${wave ? ' is-waving' : ''}`, 'aria-hidden': 'true',
-    style: { width: size + 'px' }, title: title || null,
+    class: `snowman snowman--${face}${wave ? ' is-waving' : ''}${isPuddle(face, m) ? ' is-puddle' : ''}`, 'aria-hidden': 'true',
+    style: { width: Math.round(w) + 'px', height: Math.round(h) + 'px' }, title: title || null,
   });
-  node.innerHTML = svg(face, m);           // static markup built from numbers only
+  node.innerHTML = svg(face, m, f);        // static markup built from numbers only
   return node;
 }
 
-function svg(face, m) {
-  const body = face === 'puddle' || m >= 7 ? puddle(face, m) : standing(face, m);
-  return `<svg viewBox="0 -26 120 152" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
+function svg(face, m, f) {
+  const body = isPuddle(face, m) ? puddle(face, m) : standing(face, m);
+  return `<svg viewBox="0 ${f.top} ${f.width} ${f.height}" xmlns="http://www.w3.org/2000/svg">${body}</svg>`;
 }
+
+/** Sizes per place, by height. Phones get a little less. */
+const narrow = () => typeof matchMedia === 'function' && matchMedia('(max-width: 600px)').matches;
+export const SIZES = {
+  verdict: () => ({ size: narrow() ? 74 : 86, maxWidth: narrow() ? 120 : 150 }),
+  summary: () => ({ size: narrow() ? 92 : 104, maxWidth: 170 }),
+  hero: (big = false) => ({ size: big ? (narrow() ? 124 : 140) : (narrow() ? 100 : 112), maxWidth: 200 }),
+  mini: () => ({ size: 36, maxWidth: 64 }),
+  badge: () => ({ size: narrow() ? 54 : 60, maxWidth: 96 }),
+};
 
 function standing(face, m) {
   const happy = HAPPY.has(face), sad = SAD.has(face);
@@ -282,17 +323,18 @@ function star(cx, cy, r) {
  * Returns null when he is switched off (el()/setChildren skip nulls).
  * Tapping him gets a poke response; tap him a lot and he lies down.
  */
-export function buddy({ face, melt = 0, quip = '', size = 54, wave = false, className = '' } = {}) {
+export function buddy({ face, melt = 0, quip = '', place = 'verdict', wave = false, className = '' } = {}) {
   if (!isEnabled()) return null;
+  const dims = SIZES[place] ? SIZES[place]() : SIZES.verdict();
   const say = el('span', { class: 'buddy__say' }, quip);
-  let fig = snowman({ face, melt, size, wave });
+  let fig = snowman({ face, melt, wave, ...dims });
   let pokes = 0;
   const wrap = el('div', { class: `buddy${className ? ' ' + className : ''}`, 'aria-hidden': 'true' });
   const poke = () => {
     pokes++;
     const lots = pokes >= 5;
     say.textContent = lots ? POKE_LOTS[Math.min(POKE_LOTS.length - 1, Math.floor((pokes - 5) / 2))] : pick(POKE);
-    const next = snowman({ face: lots ? 'nervous' : 'happy', melt, size });
+    const next = snowman({ face: lots ? 'nervous' : 'happy', melt, ...dims });
     if (pokes >= 9) next.classList.add('is-toppled');
     else next.classList.add('is-poked');
     fig.replaceWith(next);
@@ -305,9 +347,9 @@ export function buddy({ face, melt = 0, quip = '', size = 54, wave = false, clas
 }
 
 /** A bigger Flurry for summaries and empty states (no bubble, caption under). */
-export function hero({ face, melt = 0, quip = '', size = 84, wave = false } = {}) {
+export function hero({ face, melt = 0, quip = '', big = false, wave = false } = {}) {
   if (!isEnabled()) return null;
   return el('div', { class: 'buddy-hero', 'aria-hidden': 'true' },
-    snowman({ face, melt, size, wave }),
+    snowman({ face, melt, wave, ...SIZES.hero(big) }),
     quip ? el('p', { class: 'buddy-hero__say' }, quip) : null);
 }

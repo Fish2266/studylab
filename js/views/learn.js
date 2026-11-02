@@ -450,7 +450,7 @@ function start(host, set, progress, session) {
       el('h2', {}, 'Round complete'),
       el('p', { class: 'round-done__sub' },
         `${roundStats.right} correct, ${roundStats.wrong} to review. ${s.mastered} of ${s.total} terms mastered.`),
-      buddy({ ...moodForScore(pct), size: 52, className: 'buddy--center' }),
+      buddy({ ...moodForScore(pct), place: 'summary', className: 'buddy--center' }),
       el('div', { class: 'stats', style: { maxWidth: '440px', margin: '0 auto 22px' } },
         stat(s.mastered, 'Mastered', 'var(--c-good)'),
         stat(s.learning, 'Still learning', 'var(--c-warn)'),
@@ -468,7 +468,7 @@ function start(host, set, progress, session) {
   function paintAllDone() {
     const s = data.summarize(set, progress);
     stage.replaceChildren(el('div', { class: 'q-card round-done' },
-      hero({ face: 'party', quip: 'Snow way — you mastered every single term!', size: 96 }) || el('div', { style: { fontSize: '3rem', lineHeight: '1' } }, '🎉'),
+      hero({ face: 'party', quip: 'Snow way — you mastered every single term!', big: true }) || el('div', { style: { fontSize: '3rem', lineHeight: '1' } }, '🎉'),
       el('h2', { style: { marginTop: '12px' } }, 'Every term mastered'),
       el('p', { class: 'round-done__sub' }, `You answered all ${plural(s.total, 'term')} correctly ${opts.masteryTarget} times in a row.`),
       el('div', { class: 'row', style: { justifyContent: 'center' } },

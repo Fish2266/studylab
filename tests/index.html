@@ -260,6 +260,18 @@ test('Flurry: melts further with every miss, refreezes with right answers', asyn
   eq(snowman({ face: 'happy' }).getAttribute('aria-hidden'), 'true', 'decorative for screen readers');
 });
 
+test('Flurry: sized by height, cropped to what is drawn, never too wide', async () => {
+  const { snowman, frame } = await import('../js/mascot.js');
+  const px = (n, k) => parseInt(n.style[k], 10);
+  const stand = snowman({ face: 'happy', size: 80 }), pud = snowman({ face: 'puddle', melt: 8, size: 80 });
+  eq(px(stand, 'height'), 80); ok(px(stand, 'width') < 80, 'standing is taller than wide');
+  ok(px(pud, 'width') > px(stand, 'width') * 1.5, 'a puddle spreads sideways instead of shrinking');
+  const capped = snowman({ face: 'puddle', melt: 7, size: 100, maxWidth: 120 });
+  eq(px(capped, 'width'), 120); ok(px(capped, 'height') < 100, 'width cap scales him down');
+  ok(frame('happy', 0).top > frame('party', 0).top, 'no empty room above a plain snowman');
+  ok(frame('puddle', 7).height < frame('happy', 0).height / 1.5, 'puddle frame is cropped');
+});
+
 test('Flurry: switched off means gone everywhere', async () => {
   const { buddy, hero } = await import('../js/mascot.js');
   const data = await import('../js/data.js');
