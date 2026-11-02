@@ -41,6 +41,10 @@ No build step: edit files, reload.
 - Smart grading also accepts definitions "in your own words" (`keyIdeasMatch` in
   `grading.js`: ≥75% of 3+ content words, no padding, same negation). Add a
   should-stay-wrong case to the tests for any loosening.
+- Flurry (`js/mascot.js`): `createMood()` per study session, `react('right'|
+  'wrong'|'skip'|'override')`, then `buddy()`/`hero()`/`snowman()` to draw.
+  Those return null when switched off — pass them through `el()`/`setChildren()`.
+  He goes beside existing feedback only, never over a question or in a popup.
 - Learn's "I was right" relies on `q.before` (card snapshot taken before
   `recordAnswer`) and stores the typed wording in `card.accepted`.
 - Safe Browsing treats all of `fish2266.github.io` as one site; a flag on any

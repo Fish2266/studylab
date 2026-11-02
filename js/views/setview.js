@@ -3,6 +3,7 @@ import { el, icon, frag, plural, relTime, truncate, debounce } from '../utils.js
 import * as data from '../data.js';
 import { toast, confirmDialog, openMenu, segBar } from '../ui.js';
 import { navigate } from '../router.js';
+import { hero } from '../mascot.js';
 import { openExportDialog, openShareDialog } from './dialogs.js';
 import { nextReviewLabel } from '../scheduler.js';
 import * as speech from '../speech.js';
@@ -27,6 +28,7 @@ export function render(mount, { params }) {
     if (destroyed) return;
     if (!set) {
       host.replaceChildren(el('div', { class: 'empty' },
+        hero({ face: 'sad', melt: 2, quip: 'I looked everywhere. Even under my hat.', size: 72 }),
         el('h1', {}, 'Set not found'),
         el('p', {}, 'It may have been deleted, or this link came from a different browser.'),
         el('a', { class: 'btn btn--primary', href: '#/' }, 'Back to library')));

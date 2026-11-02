@@ -13,6 +13,7 @@ import { grade, distractors } from '../grading.js';
 import { buildRound, questionKindFor, recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
 import * as speech from '../speech.js';
 import { celebrateIfMastered } from '../celebrate.js';
+import { createMood, moodForScore, buddy, hero } from '../mascot.js';
 import { openOptions, optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
 export function render(mount, { params }) {
@@ -46,6 +47,7 @@ function start(host, set, progress, session) {
   let round = [];          // queue of terms for this round
   let roundIndex = 0;
   let roundStats = { right: 0, wrong: 0, total: 0 };
+  const flurry = createMood();   // the snowman's mood for this session
   let q = null;            // current question
   let answered = false;
   let busy = false;
@@ -324,10 +326,11 @@ function start(host, set, progress, session) {
       roundStats.total = round.length;
     }
 
-    showVerdict({ correct, close, given, dontKnow, selfGraded, card, ownWords });
+    const reaction = flurry.react(dontKnow ? 'skip' : correct ? 'right' : 'wrong');
+    showVerdict({ correct, close, given, dontKnow, selfGraded, card, ownWords, reaction });
   }
 
-  function showVerdict({ correct, close, given, dontKnow, selfGraded, ownWords }) {
+  function showVerdict({ correct, close, given, dontKnow, selfGraded, ownWords, reaction }) {
     const card = stage.querySelector('.q-card');
     if (!card) return;
 
@@ -374,6 +377,7 @@ function start(host, set, progress, session) {
           speech.supported ? el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: () => speech.speak(q.answerText, { lang: q.answerLang }) }, icon('sound'), 'Hear it') : null,
           el('button', { class: 'btn btn--sm', type: 'button', onclick: star }, icon('star'), q.term.starred ? 'Starred' : 'Star this'),
         ),
+        reaction ? buddy(reaction) : null,
       ),
     );
     card.appendChild(verdict);
@@ -401,6 +405,7 @@ function start(host, set, progress, session) {
       // streak, so an override could never lead to mastery.
       // The typed wording is accepted for this term from now on.
       const c = overrideAsCorrect(progress, q.term.id, q.before, given, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+      flurry.react('override');             // he refreezes a bit too
       const toGo = Math.max(0, opts.masteryTarget - c.streak);
       roundStats.wrong = Math.max(0, roundStats.wrong - 1);
       roundStats.right++;
@@ -445,6 +450,7 @@ function start(host, set, progress, session) {
       el('h2', {}, 'Round complete'),
       el('p', { class: 'round-done__sub' },
         `${roundStats.right} correct, ${roundStats.wrong} to review. ${s.mastered} of ${s.total} terms mastered.`),
+      buddy({ ...moodForScore(pct), size: 52, className: 'buddy--center' }),
       el('div', { class: 'stats', style: { maxWidth: '440px', margin: '0 auto 22px' } },
         stat(s.mastered, 'Mastered', 'var(--c-good)'),
         stat(s.learning, 'Still learning', 'var(--c-warn)'),
@@ -462,7 +468,7 @@ function start(host, set, progress, session) {
   function paintAllDone() {
     const s = data.summarize(set, progress);
     stage.replaceChildren(el('div', { class: 'q-card round-done' },
-      el('div', { style: { fontSize: '3rem', lineHeight: '1' } }, '🎉'),
+      hero({ face: 'party', quip: 'Snow way — you mastered every single term!', size: 96 }) || el('div', { style: { fontSize: '3rem', lineHeight: '1' } }, '🎉'),
       el('h2', { style: { marginTop: '12px' } }, 'Every term mastered'),
       el('p', { class: 'round-done__sub' }, `You answered all ${plural(s.total, 'term')} correctly ${opts.masteryTarget} times in a row.`),
       el('div', { class: 'row', style: { justifyContent: 'center' } },

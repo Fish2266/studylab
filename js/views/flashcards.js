@@ -5,6 +5,7 @@ import { toast } from '../ui.js';
 import { navigate } from '../router.js';
 import * as speech from '../speech.js';
 import { openOptions, optionGroup, checkboxRow, selectRow, rangeRow } from './options.js';
+import { hero } from '../mascot.js';
 
 export function render(mount, { params }) {
   const setId = params[0];
@@ -190,6 +191,9 @@ function start(host, set, progress, session) {
   function paintDone() {
     const tally = countSorted();
     stage.replaceChildren(el('div', { class: 'round-done', style: { width: '100%' } },
+      hero(opts.trackProgress && !tally.learning && tally.known
+        ? { face: 'grin', quip: 'You know every card! I’m so proud I could melt. (I won’t.)', size: 72 }
+        : { face: 'wave', wave: true, quip: tally.learning && opts.trackProgress ? 'That’s the deck! Learn mode will drill the tricky ones.' : 'That’s the whole deck. Nice!', size: 72 }),
       el('h2', {}, 'You have been through every card'),
       el('p', { class: 'round-done__sub' }, opts.trackProgress
         ? `${tally.known} marked as known, ${tally.learning} still learning.`

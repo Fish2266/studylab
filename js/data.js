@@ -18,6 +18,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   readFont: 'sans',                // sans | serif | mono | dys
   reduceMotion: false,
   confirmDelete: true,
+  mascot: true,                    // Flurry the snowman
   sound: false,
   library: { sort: 'updated', view: 'grid' },
 

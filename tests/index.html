@@ -18,7 +18,7 @@ function test(name, fn) { results.push({ name, fn }); }
 const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg || ''} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); };
 const ok = (v, msg) => { if (!v) throw new Error(msg || 'expected truthy'); };
 
-const MODULES = ['utils','ui','data','storage','router','theme','grading','scheduler','speech','importers','share','qr','celebrate',
+const MODULES = ['utils','ui','data','storage','router','theme','grading','scheduler','speech','importers','share','qr','celebrate','mascot',
   'views/library','views/setview','views/editor','views/flashcards','views/learn','views/test','views/match',
   'views/importview','views/settings','views/shared','views/dialogs','views/options','views/streak'];
 
@@ -232,6 +232,44 @@ test('Learn rounds ask every term once, even when all are in progress', async ()
   eq(r.length, 5); eq(new Set(r).size, 5, 'no repeats');
   const r2 = buildRound(Array.from({ length: 20 }, (_, i) => ({ id: 'x' + i })), { cards: Object.fromEntries(Array.from({ length: 20 }, (_, i) => ['x' + i, { status: i < 12 ? 'learning' : 'new', box: 0, wrong: 0, due: 0 }])) }, { roundSize: 7 });
   eq([r2.length, new Set(r2).size], [7, 7]);
+});
+
+test('Flurry: melts further with every miss, refreezes with right answers', async () => {
+  const { createMood, moodForScore, snowman, MAX_MELT } = await import('../js/mascot.js');
+  const f = createMood();
+  const faces = [], melts = [];
+  for (let i = 0; i < 12; i++) { const r = f.react('wrong'); faces.push(r.face); melts.push(r.melt); ok(r.quip && !r.quip.includes('{n}'), 'quip filled in'); }
+  eq(faces.slice(0, 8), ['worried', 'sad', 'cry', 'cry', 'sob', 'sob', 'puddle', 'puddle'], 'escalation');
+  eq(melts.slice(0, 4), [1, 2, 3, 4]); eq(Math.max(...melts), MAX_MELT, 'capped');
+  // recovery: first right after a meltdown gets a recovery line, melt goes down
+  const back = f.react('right');
+  eq(back.face, 'happy'); ok(back.melt < MAX_MELT);
+  let r; for (let i = 0; i < 7; i++) r = f.react('right');
+  eq([r.face, r.melt], ['party', 0], 'eight in a row: party, fully refrozen');
+  eq(f.react('skip').face, 'think', '"don\'t know" is not punished');
+  eq([0, 19, 20, 45, 70, 85, 100].map(p => moodForScore(p).face), ['puddle', 'puddle', 'cry', 'worried', 'happy', 'grin', 'party']);
+  // drawings: valid markup for every state, puddle form when melted, help sign at the very end
+  for (const face of ['happy', 'grin', 'cool', 'party', 'wave', 'think', 'nervous', 'worried', 'sad', 'cry', 'sob', 'puddle']) {
+    for (const melt of [0, 4, 9]) {
+      const n = snowman({ face, melt });
+      ok(n.querySelector('svg') && !/NaN|undefined|null/.test(n.innerHTML), `${face}/${melt} draws cleanly`);
+    }
+  }
+  ok(snowman({ face: 'puddle', melt: 9 }).textContent.includes('help'), 'the help sign');
+  ok(!snowman({ face: 'sad', melt: 3 }).textContent.includes('help'));
+  eq(snowman({ face: 'happy' }).getAttribute('aria-hidden'), 'true', 'decorative for screen readers');
+});
+
+test('Flurry: switched off means gone everywhere', async () => {
+  const { buddy, hero } = await import('../js/mascot.js');
+  const data = await import('../js/data.js');
+  const s = data.getSettings(), before = s.mascot;
+  try {
+    s.mascot = false;                                   // in memory only — nothing is saved
+    eq([buddy({ face: 'happy', quip: 'x' }), hero({ face: 'happy' })], [null, null]);
+    s.mascot = true;
+    ok(buddy({ face: 'happy', quip: 'x' }).querySelector('.snowman'));
+  } finally { s.mascot = before; }
 });
 
 test('importers: real-world formats', async () => {

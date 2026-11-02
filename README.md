@@ -122,6 +122,17 @@ Flashcards, pairs in Match). A streak is not lost at midnight — it counts back
 from yesterday until you study today. Mastering every term in a set gets a
 burst of confetti (skipped when reduced motion is on).
 
+### Flurry the snowman
+A small snowman who reacts to how you are doing. Right answers refreeze him
+(grin → sunglasses → party hat on a long run); wrong answers melt him, one
+step per miss, until he is a puddle with a hat floating in it holding a
+"help" sign. He only appears beside feedback that is already on screen
+(Learn and Test verdicts, round and test summaries, end screens, empty
+states, a tiny one by the Match timer), is hidden from screen readers, slips
+in a genuine study tip every few misses, and can be turned off in
+**Settings → Appearance**. Tap him for a reaction; tap him a lot and he lies
+down.
+
 ### Match
 Pair terms with definitions against the clock. Wrong pairs add a one-second
 penalty, and your best time per set is saved.
@@ -177,6 +188,7 @@ js/importers.js       parsers for CSV/TSV/JSON/Markdown/Anki
 js/share.js           export formats and gzip share links
 js/qr.js              dependency-free QR code encoder (share dialog)
 js/celebrate.js       mastery detection and confetti
+js/mascot.js          Flurry the snowman: drawing, moods, quips
 js/speech.js          text-to-speech (degrades to a no-op)
 js/theme.js           appearance, incl. the generated favicon
 js/ui.js              toasts, modals, menus, form primitives

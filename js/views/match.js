@@ -3,6 +3,7 @@ import { el, icon, shuffle, sample, isTyping, plural, clamp } from '../utils.js'
 import * as data from '../data.js';
 import { toast } from '../ui.js';
 import { kvGet, kvSet } from '../storage.js';
+import { createMood, snowman, hero, isEnabled as flurryOn } from '../mascot.js';
 import { openOptions, optionGroup, numberRow, selectRow } from './options.js';
 
 const PENALTY_MS = 1000;
@@ -51,6 +52,10 @@ function start(host, set, usable, best, session) {
   let bestMs = best;
 
   const timerEl = el('span', { class: 'timer' }, '0:00');
+  // A tiny Flurry by the timer: flinches at wrong pairs, perks up at right ones.
+  let flurry = createMood();
+  const mini = el('span', { class: 'match-mini' });
+  const setMini = (r) => { if (flurryOn()) mini.replaceChildren(snowman({ face: r.face, melt: r.melt, size: 26 })); };
   const bestEl = el('span', { class: 'chip' });
   const board = el('div', { class: 'match-board' });
   const stage = el('div', {});
@@ -60,7 +65,7 @@ function start(host, set, usable, best, session) {
   host.append(
     el('div', { class: 'study__head' },
       el('div', { class: 'study__title' }, el('h1', {}, 'Match'), el('p', {}, set.title)),
-      el('div', { class: 'study__tools' }, bestEl, timerEl, optionsBtn,
+      el('div', { class: 'study__tools' }, mini, bestEl, timerEl, optionsBtn,
         el('a', { class: 'icon-btn', href: `#/set/${set.id}`, 'aria-label': 'Back to set' }, icon('x'))),
     ),
     stage,
@@ -90,6 +95,8 @@ function start(host, set, usable, best, session) {
     selected = null;
     matched = 0;
     penalties = 0;
+    flurry = createMood();
+    setMini({ face: 'happy', melt: 0 });
     running = false;
     startedAt = 0;
     timerEl.textContent = '0:00';
@@ -141,12 +148,14 @@ function start(host, set, usable, best, session) {
     if (prev.pairId === tile.pairId && prev.side !== tile.side) {
       [prevNode, node].forEach(n => { n.classList.remove('is-sel'); n.classList.add('is-hit'); n.disabled = true; });
       matched++;
+      setMini(flurry.react('right'));
       setTimeout(() => {
         [prevNode, node].forEach(n => n.classList.add('is-gone'));
         if (matched === tiles.length / 2) finish();
       }, 180);
     } else {
       penalties += PENALTY_MS;
+      setMini(flurry.react('wrong'));
       [prevNode, node].forEach(n => { n.classList.remove('is-sel'); n.classList.add('is-miss'); });
       setTimeout(() => [prevNode, node].forEach(n => n && n.classList.remove('is-miss')), 400);
     }
@@ -176,7 +185,10 @@ function start(host, set, usable, best, session) {
     refreshBest();
 
     stage.replaceChildren(el('div', { class: 'q-card round-done' },
-      el('div', { style: { fontSize: '2.6rem' } }, isBest ? '🏆' : '⚡'),
+      hero(isBest && !penalties ? { face: 'cool', quip: 'A new record AND no mistakes? Ice cold.' }
+        : isBest ? { face: 'grin', quip: 'New best! I’d clap, but: twigs.' }
+        : penalties >= 5000 ? { face: 'nervous', melt: 2, quip: 'Fast-ish… but very sweaty. Fewer guesses = faster time!' }
+        : { face: 'happy', quip: 'Nice matching! Go again and beat your best?' }) || el('div', { style: { fontSize: '2.6rem' } }, isBest ? '🏆' : '⚡'),
       el('h2', { style: { marginTop: '10px' } }, isBest ? 'New best time' : 'Finished'),
       el('div', { class: 'test-score__big', style: { color: 'var(--c-accent)', margin: '10px 0' } }, fmt(ms)),
       el('p', { class: 'round-done__sub' },

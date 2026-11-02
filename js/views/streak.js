@@ -7,6 +7,7 @@
  */
 import { el, plural } from '../utils.js';
 import * as data from '../data.js';
+import { snowman, isEnabled as flurryOn } from '../mascot.js';
 
 const WEEKS = 53;
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
@@ -44,7 +45,8 @@ export function streakCard(now = new Date()) {
       el('div', { class: 'streak__head' }, headline,
         el('div', { class: 'streak__text' },
           el('div', { class: 'streak__title' }, 'Start a study streak'),
-          el('div', { class: 'streak__sub' }, 'Study any set today and your calendar starts filling in here.'))));
+          el('div', { class: 'streak__sub' }, 'Study any set today and your calendar starts filling in here.')),
+        flurryBy(info)));
   }
 
   return el('section', { class: 'streak card', 'aria-label': 'Study streak' },
@@ -53,8 +55,22 @@ export function streakCard(now = new Date()) {
       el('div', { class: 'streak__text' },
         el('div', { class: 'streak__title' }, info.current ? 'day streak' : 'No streak yet'),
         el('div', { class: 'streak__sub' }, sub),
-        meta ? el('div', { class: 'streak__meta' }, meta) : null)),
+        meta ? el('div', { class: 'streak__meta' }, meta) : null),
+      flurryBy(info)),
     heatmap(days, now));
+}
+
+/** Flurry, standing slightly too close to your streak's flame. */
+function flurryBy(info) {
+  if (!flurryOn()) return null;
+  const [face, melt, title] = !info.current
+    ? ['wave', 0, 'Hi! Study anything today and we’ll light this thing.']
+    : info.studiedToday
+      ? [info.current >= 7 ? 'cool' : 'happy', 0, info.current >= 7 ? 'A week-long streak. Too cool.' : 'Done for today! I’m staying frosty.']
+      : ['nervous', 1, 'Your streak is waiting… (also, this fire is VERY close to me)'];
+  const s = snowman({ face, melt, size: 38, title });
+  s.classList.add('streak__flurry');
+  return s;
 }
 
 export function heatmap(days, now = new Date()) {

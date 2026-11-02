@@ -537,3 +537,70 @@ html[data-theme="dark"] #btn-theme .ico-moon { display: block; }
 .streak--new .streak__n { font-size: 1.6rem; }
 .chip--mastery { background: linear-gradient(90deg, var(--c-good-bg) var(--pct, 0%), transparent var(--pct, 0%)); }
 .chip[hidden] { display: none; }
+
+/* ---- Flurry the snowman (mascot.js) ---- */
+:root {
+  --snow-fill: #ffffff; --snow-line: hsl(215 28% 80%); --snow-shade: hsl(212 50% 93%);
+  --snow-water: hsl(204 85% 72% / .75); --snow-cloud: hsl(215 14% 70%);
+  --snow-scarf: hsl(var(--accent-h) 70% 58%);
+}
+html[data-theme="dark"] {
+  --snow-fill: hsl(215 40% 96%); --snow-line: hsl(215 20% 62%); --snow-shade: hsl(214 34% 84%);
+  --snow-water: hsl(204 80% 62% / .7); --snow-cloud: hsl(220 10% 52%);
+}
+.snowman { display: inline-block; flex: none; line-height: 0; cursor: default; }
+.snowman svg { width: 100%; height: auto; overflow: visible; }
+.buddy .snowman, .buddy-hero .snowman { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+
+/* beside a verdict: small, quiet, to the point */
+.buddy { display: flex; align-items: flex-end; gap: 10px; margin-top: 12px; min-width: 0; }
+.buddy__say { position: relative; font-size: .84rem; line-height: 1.35; color: var(--c-text-mid);
+  background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 14px 14px 14px 4px;
+  padding: 7px 11px; margin-bottom: 14px; max-width: 34ch; animation: buddy-say .28s var(--ease) both; }
+.verdict .buddy__say { background: color-mix(in srgb, var(--c-surface) 82%, transparent); }
+@keyframes buddy-say { from { opacity: 0; transform: translateY(4px) scale(.96); } }
+
+/* summaries and empty states: a little bigger, caption below */
+.buddy-hero { display: grid; justify-items: center; gap: 4px; margin: 0 auto 6px; }
+.buddy-hero__say { font-size: .9rem; color: var(--c-text-mid); font-style: italic; text-align: center; max-width: 36ch; margin: 0; }
+
+/* moods in motion — all stilled by reduced motion */
+.snowman--happy svg, .snowman--grin svg, .snowman--wave svg { animation: sm-hop .5s var(--ease) 1; transform-origin: 50% 100%; }
+.snowman--cool svg, .snowman--party svg { animation: sm-bop .9s ease-in-out infinite; transform-origin: 50% 100%; }
+.snowman--worried svg, .snowman--sad svg { animation: sm-shiver .35s ease-in-out 2; }
+.snowman--cry svg, .snowman--sob svg { animation: sm-sag 1.6s ease-in-out infinite; transform-origin: 50% 100%; }
+.is-waving .sm-arm-r, .snowman--wave .sm-arm-r { animation: sm-wave 1.1s ease-in-out 2; transform-box: view-box; transform-origin: 75px 64px; }
+.is-poked svg { animation: sm-boing .45s var(--ease) 1 !important; transform-origin: 50% 100%; }
+.is-toppled svg { transform: translate(18%, 4%) rotate(-78deg); transform-origin: 55% 92%; transition: transform .5s cubic-bezier(.5, -0.4, .6, 1.4); }
+.sm-tear { animation: sm-drip 1.1s ease-in infinite; }
+.sm-tear--2 { animation-delay: .5s; }
+.sm-fountain { stroke-dasharray: 5 5; animation: sm-flow .5s linear infinite; }
+.sm-fountain--2 { animation-delay: .25s; }
+.sm-rain { animation: sm-rain .7s linear infinite; }
+.sm-rain--2 { animation-delay: .35s; }
+.sm-sweat { animation: sm-drip 1.6s ease-in infinite; }
+.sm-drop { animation: sm-ripple 2s ease-in-out infinite; }
+.sm-drop--2 { animation-delay: 1s; }
+.sm-spark { animation: sm-twinkle 1.2s ease-in-out infinite; transform-box: fill-box; transform-origin: center; }
+.sm-spark:nth-child(2n) { animation-delay: .4s; }
+.sm-bubble { animation: sm-bubble 2.4s ease-in infinite; }
+.sm-bubble--2 { animation-delay: 1.1s; }
+.sm-sign { animation: sm-sway 2.2s ease-in-out infinite; transform-box: view-box; transform-origin: 93px 108px; }
+@keyframes sm-hop { 30% { transform: translateY(-8%) scaleY(1.04); } 60% { transform: translateY(0) scaleY(.96); } }
+@keyframes sm-bop { 50% { transform: translateY(-4%) rotate(2deg); } }
+@keyframes sm-shiver { 25% { transform: translateX(-2%); } 75% { transform: translateX(2%); } }
+@keyframes sm-sag { 50% { transform: scaleY(.97) scaleX(1.02); } }
+@keyframes sm-wave { 50% { transform: rotate(-22deg); } }
+@keyframes sm-boing { 30% { transform: scale(1.12, .86); } 60% { transform: scale(.94, 1.08); } }
+@keyframes sm-drip { from { transform: translateY(0); opacity: 1; } to { transform: translateY(14px); opacity: 0; } }
+@keyframes sm-flow { to { stroke-dashoffset: -10; } }
+@keyframes sm-rain { from { transform: translateY(-3px); opacity: 0; } 40% { opacity: 1; } to { transform: translateY(9px); opacity: 0; } }
+@keyframes sm-ripple { 50% { transform: translateY(-1px); opacity: .5; } }
+@keyframes sm-twinkle { 50% { transform: scale(.4) rotate(30deg); opacity: .5; } }
+@keyframes sm-bubble { from { transform: translateY(0); opacity: 0; } 30% { opacity: 1; } to { transform: translateY(-14px); opacity: 0; } }
+@keyframes sm-sway { 50% { transform: rotate(6deg); } }
+.buddy--center { justify-content: center; margin: 0 auto 18px; }
+.buddy--score { margin: 14px auto 0; }
+.match-mini { display: inline-flex; align-items: flex-end; height: 34px; }
+.streak__flurry { margin-left: auto; align-self: flex-end; }
+.empty .buddy-hero { margin-bottom: 10px; }

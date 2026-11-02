@@ -7,6 +7,7 @@ import { ACCENTS, applyAppearance } from '../theme.js';
 import { openShortcutsDialog } from './dialogs.js';
 import { checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 import { navigate } from '../router.js';
+import { NAME as MASCOT_NAME } from '../mascot.js';
 
 export function render(mount) {
   const host = el('div', {});
@@ -77,6 +78,10 @@ function appearancePanel(s, save) {
       optionRow({
         label: 'Reduce motion', sub: 'Turn off flips, slides and fades',
         control: (id) => switchToggle(s.reduceMotion, v => save({ reduceMotion: v }), id),
+      }),
+      optionRow({
+        label: `${MASCOT_NAME} the snowman`, sub: 'Cheers you on — and melts a little every time you miss',
+        control: (id) => switchToggle(s.mascot !== false, v => save({ mascot: v }), id),
       }),
       optionRow({
         label: 'Confirm before deleting', sub: 'Ask before removing a set',

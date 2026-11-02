@@ -5,6 +5,7 @@ import { toast, confirmDialog, openMenu } from '../ui.js';
 import { navigate } from '../router.js';
 import { openExportDialog, openShareDialog } from './dialogs.js';
 import { streakCard } from './streak.js';
+import { hero } from '../mascot.js';
 
 const PAGE = 24;                     // rows rendered per chunk — keeps 1000-set libraries smooth
 
@@ -105,6 +106,7 @@ export function render(mount) {
     if (!total) { mountEmpty(); return; }
     if (!rows.length) {
       results.appendChild(el('div', { class: 'empty' },
+        hero({ face: 'think', quip: 'I looked under every snowflake.', size: 64 }),
         el('h2', {}, 'No matches'),
         el('p', {}, `Nothing matched “${truncate(query, 40)}”.`),
         el('button', { class: 'btn', type: 'button', onclick: () => { search.value = ''; query = ''; folder = ''; paint(); } }, 'Clear filters')));
@@ -126,7 +128,8 @@ export function render(mount) {
     moreWrap.replaceChildren();
     results.className = '';
     results.replaceChildren(el('div', { class: 'empty' },
-      el('div', { class: 'empty__icon' }, icon('cards')),
+      hero({ face: 'wave', wave: true, quip: 'Hi, I’m Flurry! Make a set and I’ll cheer you on. (And melt a bit when you miss. No pressure.)', size: 90 })
+        || el('div', { class: 'empty__icon' }, icon('cards')),
       el('h2', {}, 'Nothing here yet'),
       el('p', {}, 'Create a set from scratch, or bring one in from Quizlet, Anki, a spreadsheet or a plain text list.'),
       el('div', { class: 'row', style: { justifyContent: 'center' } },

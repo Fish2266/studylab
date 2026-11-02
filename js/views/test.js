@@ -10,6 +10,7 @@ import { navigate } from '../router.js';
 import { grade, distractors } from '../grading.js';
 import { recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
 import { celebrateIfMastered } from '../celebrate.js';
+import { createMood, moodForScore, buddy } from '../mascot.js';
 import { optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
 const LETTERS = 'ABCDEFGHIJ';
@@ -46,6 +47,7 @@ function controller(host, set, progress, session) {
   let answers = new Map();
   let graded = false;
   let deadline = 0;
+  let flurry = createMood();
 
   const head = el('div', { class: 'study__head' },
     el('div', { class: 'study__title' }, el('h1', {}, 'Test'), el('p', {}, set.title)),
@@ -133,6 +135,7 @@ function controller(host, set, progress, session) {
 
   /* ---------------- sitting the test ---------------- */
   function paintPaper() {
+    flurry = createMood();          // a fresh snowman for every sitting
     const progressBar = el('div', { class: 'bar__fill' });
     const answeredLabel = el('span', { class: 'study__counter' });
     const timerEl = el('span', { class: 'timer' });
@@ -361,7 +364,8 @@ function controller(host, set, progress, session) {
         el('span', { class: 'verdict__icon' }, icon(r.correct ? 'check' : 'x')),
         el('div', { class: 'verdict__body' },
           el('div', { class: 'verdict__h' }, r.correct ? 'Correct' : 'Incorrect'),
-          r.correct ? null : el('div', { class: 'verdict__ans' }, el('strong', {}, 'Answer: '), q.answerText))));
+          r.correct ? null : el('div', { class: 'verdict__ans' }, el('strong', {}, 'Answer: '), q.answerText),
+          buddy(flurry.react(r.correctCount === r.total ? 'right' : 'wrong')))));
     }
   }
 
@@ -411,6 +415,7 @@ function controller(host, set, progress, session) {
       setChildren(summary,
         el('div', { class: 'test-score__big', style: { color: scoreColor } }, `${pct}%`),
         el('div', { class: 'test-score__sub' }, `${right} of ${total} correct`),
+        buddy({ ...moodForScore(pct), size: 56, className: 'buddy--center buddy--score' }),
         overridden ? el('div', { class: 'field__hint' }, `Includes ${plural(overridden, 'answer')} you marked correct`) : null,
         el('div', { class: 'row', style: { justifyContent: 'center', marginTop: '20px' } },
           wrongTerms.length ? el('a', { class: 'btn btn--primary', href: `#/set/${set.id}/learn` }, icon('brain'), `Study the ${wrongTerms.length} you missed`) : null,
