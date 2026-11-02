@@ -94,14 +94,21 @@ function start(host, set, progress, session) {
   shuffleBtn.setAttribute('aria-pressed', String(opts.shuffle));
   const audioBtn = speech.supported ? iconBtn('sound', 'Read aloud (A)', () => speakCurrent(true)) : null;
   const fullBtn = iconBtn('expand', 'Fullscreen (F)', toggleFull);
-  const optionsBtn = iconBtn('cog', 'Options (O)', showOptions);
+  const optionsBtn = iconBtn('sliders', 'Options (O)', showOptions);
 
   const stage = el('div', { class: 'fc-stage' });
   const cardEl = el('div', {
     class: 'fc-card', role: 'button', tabindex: '0',
-    onclick: (e) => { if (!e.target.closest('[data-tool]')) flip(); },
+    onclick: (e) => {
+      if (swipe.justDragged) { swipe.justDragged = false; return; }   // the end of a swipe is not a tap
+      if (!e.target.closest('[data-tool]')) flip();
+    },
   });
-  stage.appendChild(cardEl);
+  const swipeLeftTag = el('div', { class: 'fc-swipe__tag fc-swipe__tag--left', 'aria-hidden': 'true' });
+  const swipeRightTag = el('div', { class: 'fc-swipe__tag fc-swipe__tag--right', 'aria-hidden': 'true' });
+  const swipeWrap = el('div', { class: 'fc-swipe' }, cardEl, swipeLeftTag, swipeRightTag);
+  stage.appendChild(swipeWrap);
+  const swipe = installSwipe();
 
   const prevBtn = el('button', { class: 'fc-round-btn', type: 'button', 'aria-label': 'Previous card', onclick: () => step(-1) }, icon('left'));
   const nextBtn = el('button', { class: 'fc-round-btn', type: 'button', 'aria-label': 'Next card', onclick: () => step(1) }, icon('right'));
@@ -110,6 +117,7 @@ function start(host, set, progress, session) {
   const sortRow = el('div', { class: 'fc-sort' },
     el('button', { class: 'btn btn--still', type: 'button', onclick: () => sortCard('learning') }, icon('undo'), 'Still learning'),
     el('button', { class: 'btn btn--know', type: 'button', onclick: () => sortCard('known') }, icon('check'), 'Know it'),
+    el('p', { class: 'fc-sort__hint' }, 'Tip: swipe the card right if you know it, left if you are still learning'),
   );
 
   host.append(
@@ -133,6 +141,11 @@ function start(host, set, progress, session) {
     if (done) { paintDone(); return; }
     const term = current();
     if (!term) { paintDone(); return; }
+    // Coming back from the end screen ("Start over"): put the card back.
+    if (swipeWrap.parentNode !== stage) stage.replaceChildren(swipeWrap);
+    swipe.reset();
+    swipeLeftTag.textContent = opts.trackProgress ? 'Still learning' : 'Next';
+    swipeRightTag.textContent = opts.trackProgress ? 'Know it' : 'Back';
     const s = sides(term);
     const card = progress.cards[term.id];
 
@@ -213,6 +226,7 @@ function start(host, set, progress, session) {
     cardEl.classList.toggle('is-flipped', flipped);
     const term = current();
     if (!term) return;
+    countStudied(term);
     const s = sides(term);
     announce(flipped ? s.backText : s.frontText);
     if (opts.speak && (opts.speakSide === 'both' || (flipped ? opts.speakSide === 'back' : opts.speakSide === 'front'))) speakCurrent();
@@ -231,6 +245,7 @@ function start(host, set, progress, session) {
     const term = current();
     if (!term) return;
     const card = progress.cards[term.id] || (progress.cards[term.id] = { ...data.DEFAULT_CARD });
+    countStudied(term);
     card.fc = kind;
     card.lastSeen = Date.now();
     if (card.status === 'new') card.status = 'learning';
@@ -250,6 +265,81 @@ function start(host, set, progress, session) {
     if (!term || (!opts.speak && !force)) return;
     const s = sides(term);
     speech.speak(flipped ? s.backText : s.frontText, { lang: flipped ? s.backLang : s.frontLang });
+  }
+
+  // A card counts towards today's streak once per visit, when you flip or sort it.
+  const studied = new Set();
+  function countStudied(term) {
+    if (studied.has(term.id)) return;
+    studied.add(term.id);
+    data.recordStudy(1);
+  }
+
+  /* ---------- swipe: right = know it, left = still learning ----------
+   * Pointer events cover touch, pen and mouse. `touch-action: pan-y` on the
+   * card lets the page still scroll vertically; we only take horizontal drags.
+   */
+  function installSwipe() {
+    const state = { id: null, x0: 0, y0: 0, dx: 0, t0: 0, dragging: false, justDragged: false, busy: false };
+    const reduced = () => document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const setX = (dx, animate) => {
+      swipeWrap.style.transition = animate ? 'transform .22s cubic-bezier(.2,.8,.2,1)' : 'none';
+      swipeWrap.style.transform = dx ? `translateX(${dx}px) rotate(${dx / 22}deg)` : '';
+      const p = Math.min(1, Math.abs(dx) / threshold());
+      swipeLeftTag.style.opacity = dx < 0 ? String(p) : '0';
+      swipeRightTag.style.opacity = dx > 0 ? String(p) : '0';
+    };
+    const threshold = () => Math.min(110, swipeWrap.offsetWidth * 0.28 || 110);
+
+    cardEl.addEventListener('pointerdown', (e) => {
+      if (state.busy || e.button > 0 || e.target.closest('[data-tool]')) return;
+      Object.assign(state, { id: e.pointerId, x0: e.clientX, y0: e.clientY, dx: 0, t0: performance.now(), dragging: false });
+    });
+    cardEl.addEventListener('pointermove', (e) => {
+      if (e.pointerId !== state.id) return;
+      const dx = e.clientX - state.x0, dy = e.clientY - state.y0;
+      if (!state.dragging) {
+        if (Math.abs(dx) < 10) return;
+        if (Math.abs(dy) > Math.abs(dx)) { state.id = null; return; }      // a scroll, not a swipe
+        state.dragging = true;
+        stopPlay();
+        try { cardEl.setPointerCapture(e.pointerId); } catch { /* fine */ }
+      }
+      state.dx = dx;
+      setX(dx, false);
+    });
+    const end = (e) => {
+      if (e.pointerId !== state.id) return;
+      state.id = null;
+      if (!state.dragging) return;
+      state.dragging = false;
+      state.justDragged = true;
+      setTimeout(() => { state.justDragged = false; }, 350);
+      const v = state.dx / Math.max(1, performance.now() - state.t0);        // px per ms
+      const commit = Math.abs(state.dx) > threshold() || (Math.abs(state.dx) > 40 && Math.abs(v) > 0.6);
+      if (!commit) { setX(0, true); return; }
+      const dir = state.dx > 0 ? 1 : -1;
+      state.busy = true;
+      const go = () => {
+        state.busy = false;
+        if (opts.trackProgress) sortCard(dir > 0 ? 'known' : 'learning');
+        else step(dir > 0 ? -1 : 1);
+        if (swipeWrap.parentNode === stage && !reduced()) {
+          swipeWrap.animate([{ opacity: 0, transform: 'scale(.96)' }, { opacity: 1, transform: 'none' }], { duration: 180, easing: 'ease-out' });
+        }
+      };
+      if (reduced()) { go(); return; }
+      setX(dir * (swipeWrap.offsetWidth * 1.3 + 80), true);
+      setTimeout(go, 200);
+    };
+    cardEl.addEventListener('pointerup', end);
+    cardEl.addEventListener('pointercancel', (e) => { if (e.pointerId === state.id) { state.id = null; state.dragging = false; setX(0, true); } });
+
+    return {
+      get justDragged() { return state.justDragged; },
+      set justDragged(v) { state.justDragged = v; },
+      reset() { if (!state.dragging) setX(0, false); },
+    };
   }
 
   let saveTimer = null;

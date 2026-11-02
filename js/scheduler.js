@@ -81,7 +81,10 @@ export function buildRound(terms, progress, { roundSize = 7, masteryTarget = 2, 
 
   const size = Math.min(roundSize, pool.length);
   const out = [];
-  const take = (list) => { for (const r of list) { if (out.length >= size) return; out.push(r.t); } };
+  // Each term at most once: the in-progress list is offered twice (a 60% share
+  // first, then the remainder), and without this check its head was repeated
+  // while other terms were never asked.
+  const take = (list) => { for (const r of list) { if (out.length >= size) return; if (!out.includes(r.t)) out.push(r.t); } };
   take(inProgress.slice(0, Math.max(1, Math.ceil(size * 0.6))));
   take(fresh);
   take(inProgress);

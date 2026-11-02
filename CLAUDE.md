@@ -32,6 +32,12 @@ No build step: edit files, reload.
   (renders the text "null"). Use `setChildren()` / `el()` from `js/utils.js`,
   which skip null children.
 - User text must reach the DOM via `el()`/textContent, never `innerHTML`.
+- Study activity (streak/heatmap) is `data.recordStudy(n)`; call it from any
+  new study surface. `data.streakInfo()` / `views/streak.js` are pure — test them
+  with a fixed `now`, never by writing activity from the test page.
+- `js/qr.js` is a hand-written QR encoder. If you touch it, re-verify with a
+  real decoder (jsQR from npm, in a scratch dir — not in the app) and update
+  the fingerprint in the tests page.
 - Learn's "I was right" relies on `q.before` (card snapshot taken before
   `recordAnswer`) and stores the typed wording in `card.accepted`.
 - Safe Browsing treats all of `fish2266.github.io` as one site; a flag on any

@@ -64,6 +64,7 @@ const ICONS = {
   play: '<path d="M7 4.8 19 12 7 19.2V4.8Z" stroke="currentColor" stroke-width="1.9" stroke-linejoin="round" fill="none"/>',
   pause: '<path d="M8.5 5v14M15.5 5v14" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>',
   expand: '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
+  sliders: '<path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" stroke="currentColor" stroke-width="1.9" fill="none"/><circle cx="9" cy="17" r="2.2" stroke="currentColor" stroke-width="1.9" fill="none"/>',
   cog: '<circle cx="12" cy="12" r="3.2" stroke="currentColor" stroke-width="1.9" fill="none"/><path d="M12 2.5v2.2M12 19.3v2.2M21.5 12h-2.2M4.7 12H2.5m15.4-6.6-1.6 1.6M7.7 16.3l-1.6 1.6m11.8 0-1.6-1.6M7.7 7.7 6.1 6.1" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/>',
   trash: '<path d="M4 7h16M10 7V4.8h4V7m-7 0 .9 12.3A1.8 1.8 0 0 0 9.7 21h4.6a1.8 1.8 0 0 0 1.8-1.7L17 7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" fill="none"/>',
   pencil: '<path d="M4 20.2h4L19 9.2a2.5 2.5 0 0 0-3.5-3.5L4.5 16.7v3.5Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" fill="none"/>',
@@ -109,6 +110,8 @@ export function debounce(fn, ms = 250) {
 }
 
 /* ---------- math / arrays ---------- */
+/** A phone or tablet: no hover, coarse pointer. Keyboard hints and focus rings are noise there. */
+export const isTouchScreen = () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 /** Deterministic PRNG so shuffles can be reproduced (test retakes, share links). */
 export function mulberry32(seed) {

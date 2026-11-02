@@ -131,6 +131,11 @@ async function boot() {
     registerRoutes();
     startRouter();
     installServiceWorker();
+    // First study of the day: a small nudge that the streak grew.
+    window.addEventListener('studylab:streak', (e) => {
+      const n = e.detail && e.detail.current;
+      if (n >= 2) toast(`🔥 ${n}-day streak — nice!`, { type: 'good', timeout: 2600 });
+    });
 
     if (backend === 'memory') {
       toast('This browser is blocking storage, so nothing will be saved when you close the tab. Export a backup before you leave.', { type: 'bad', timeout: 12000 });

@@ -55,7 +55,7 @@ function start(host, set, usable, best, session) {
   const board = el('div', { class: 'match-board' });
   const stage = el('div', {});
 
-  const optionsBtn = el('button', { class: 'icon-btn', type: 'button', title: 'Options', 'aria-label': 'Match options', onclick: showOptions }, icon('cog'));
+  const optionsBtn = el('button', { class: 'icon-btn', type: 'button', title: 'Options', 'aria-label': 'Match options', onclick: showOptions }, icon('sliders'));
 
   host.append(
     el('div', { class: 'study__head' },
@@ -167,6 +167,7 @@ function start(host, set, usable, best, session) {
     running = false;
     cancelAnimationFrame(session.raf);
     const ms = elapsed();
+    data.recordStudy(tiles.length / 2);
     const isBest = !bestMs || ms < bestMs;
     if (isBest) {
       bestMs = ms;

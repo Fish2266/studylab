@@ -18,9 +18,9 @@ function test(name, fn) { results.push({ name, fn }); }
 const eq = (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new Error(`${msg || ''} expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); };
 const ok = (v, msg) => { if (!v) throw new Error(msg || 'expected truthy'); };
 
-const MODULES = ['utils','ui','data','storage','router','theme','grading','scheduler','speech','importers','share',
+const MODULES = ['utils','ui','data','storage','router','theme','grading','scheduler','speech','importers','share','qr','celebrate',
   'views/library','views/setview','views/editor','views/flashcards','views/learn','views/test','views/match',
-  'views/importview','views/settings','views/shared','views/dialogs','views/options'];
+  'views/importview','views/settings','views/shared','views/dialogs','views/options','views/streak'];
 
 test('every module loads', async () => {
   const fails = [];
@@ -140,6 +140,81 @@ test('tapping the words of a switch row flips the switch', async () => {
   rows[0].querySelector('.opt-row__label').click();
   eq(types, { written: false, matching: true });
   rows.forEach(r => r.remove());
+});
+
+test('QR codes: capacities, a scanner-verified matrix, and too-long links', async () => {
+  const { encodeQR, capacity, MAX_QR_BYTES, qrSvg } = await import('../js/qr.js');
+  eq([1, 10, 25, 40].map(v => [capacity(v, 'L'), capacity(v, 'M')]), [[17, 14], [271, 213], [1273, 997], [2953, 2331]], 'ISO 18004 byte capacities');
+  eq(MAX_QR_BYTES, 2953);
+  // This exact matrix was decoded successfully by an independent QR reader (jsQR).
+  const text = 'https://fish2266.github.io/studylab/#/s/gH4sIAAAAAAAAA6tWKkktLlGyUkoqTVHSUcpLzE0F8pMSixRqAQB_test';
+  const qr = encodeQR(text);
+  let h = 2166136261; for (const row of qr.modules) for (const v of row) { h ^= v ? 1 : 0; h = Math.imul(h, 16777619) >>> 0; }
+  eq([qr.version, qr.ecl, qr.size, h.toString(16)], [6, 'M', 41, 'a3d9916f']);
+  // finder patterns in three corners
+  const finder = (x, y) => [0, 6].every(d => qr.modules[y][x + d] && qr.modules[y + d][x]) && !qr.modules[y + 1][x + 1] && qr.modules[y + 3][x + 3];
+  ok(finder(0, 0) && finder(qr.size - 7, 0) && finder(0, qr.size - 7), 'finder patterns');
+  // longer text -> bigger version; drops to level L before giving up
+  ok(encodeQR('x'.repeat(500)).version > qr.version);
+  eq(encodeQR('x'.repeat(2400)).ecl, 'L');
+  let threw = false; try { encodeQR('x'.repeat(3000)); } catch { threw = true; }
+  ok(threw, 'over 2953 bytes must throw');
+  const svg = qrSvg(qr); ok(svg.querySelector('path').getAttribute('d').length > 100, 'svg drawn');
+});
+
+test('streaks: counting days, gaps, and "not lost until tomorrow"', async () => {
+  const { streakInfo, dayKey, addDays } = await import('../js/data.js');
+  const now = new Date(2026, 10, 2, 15, 0);          // 2 Nov 2026, afternoon
+  const d = (n) => dayKey(addDays(now, -n));
+  const days = (...ns) => Object.fromEntries(ns.map(n => [d(n), 5]));
+  eq(streakInfo({}, now).current, 0);
+  eq(streakInfo(days(0, 1, 2), now).current, 3, 'today + 2 before');
+  eq(streakInfo(days(1, 2, 3), now).current, 3, 'yesterday still counts before you study today');
+  eq(streakInfo(days(1, 2, 3), now).studiedToday, false);
+  eq(streakInfo(days(2, 3), now).current, 0, 'a missed day breaks it');
+  const s = streakInfo(days(0, 10, 11, 12, 13, 20), now);
+  eq([s.current, s.best, s.totalDays, s.today], [1, 4, 6, 5]);
+  // across a month boundary and DST change (1 Nov in the US)
+  eq(streakInfo(days(0, 1, 2, 3, 4), now).current, 5);
+  eq(dayKey(new Date(2026, 0, 5)), '2026-01-05');
+});
+
+test('study calendar renders a year with today marked', async () => {
+  const { heatmap, level } = await import('../js/views/streak.js');
+  const { dayKey } = await import('../js/data.js');
+  eq([0, 1, 9, 10, 29, 30, 59, 60, 500].map(level), [0, 1, 1, 2, 2, 3, 3, 4, 4]);
+  const now = new Date(2026, 10, 2);
+  const h = heatmap({ [dayKey(now)]: 40, '2026-10-01': 3 }, now);
+  eq(h.querySelectorAll('.heat__col').length, 53);
+  eq(h.querySelectorAll('.is-today').length, 1);
+  ok(h.querySelector('.is-today').classList.contains('l3'));
+  eq(h.querySelectorAll('.heat__grid .l1').length, 1);
+  ok(!/\b(null|undefined)\b/.test(h.textContent));
+});
+
+test('mastery celebration fires once per time a set becomes fully mastered', async () => {
+  const { checkMastered } = await import('../js/celebrate.js');
+  const set = { terms: [{ id: 'a', term: 'a', definition: '1' }, { id: 'b', term: 'b', definition: '2' }, { id: 'c', term: '', definition: '' }] };
+  const p = { cards: { a: { status: 'mastered' }, b: { status: 'learning' } } };
+  eq(checkMastered(set, p), false, 'not all mastered');
+  p.cards.b.status = 'mastered';
+  eq(checkMastered(set, p), true, 'blank cards are ignored');
+  eq(checkMastered(set, p), false, 'only once');
+  p.cards.b.status = 'learning';
+  eq(checkMastered(set, p), false); ok(!p.masteredAt, 'slipping back clears it');
+  p.cards.b.status = 'mastered';
+  eq(checkMastered(set, p), true, 're-mastering celebrates again');
+  eq(checkMastered({ terms: [] }, { cards: {} }), false, 'empty set never "mastered"');
+});
+
+test('Learn rounds ask every term once, even when all are in progress', async () => {
+  const { buildRound } = await import('../js/scheduler.js');
+  const terms = Array.from({ length: 5 }, (_, i) => ({ id: 't' + i }));
+  const learning = { cards: Object.fromEntries(terms.map(t => [t.id, { status: 'learning', box: 0, wrong: 0, due: 0 }])) };
+  const r = buildRound(terms, learning, { roundSize: 7 });
+  eq(r.length, 5); eq(new Set(r).size, 5, 'no repeats');
+  const r2 = buildRound(Array.from({ length: 20 }, (_, i) => ({ id: 'x' + i })), { cards: Object.fromEntries(Array.from({ length: 20 }, (_, i) => ['x' + i, { status: i < 12 ? 'learning' : 'new', box: 0, wrong: 0, due: 0 }])) }, { roundSize: 7 });
+  eq([r2.length, new Set(r2).size], [7, 7]);
 });
 
 test('importers: real-world formats', async () => {

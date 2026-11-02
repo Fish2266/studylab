@@ -360,7 +360,7 @@ function build(host, set, isNew) {
       null,
       { label: 'Paste a list...', iconName: 'upload', onClick: () => navigate(`/import?set=${encodeURIComponent(set.id)}`) },
     ]),
-  }, icon('cog'), 'Tools');
+  }, icon('sliders'), 'Tools');
 
   /* ---- layout ---- */
   host.append(

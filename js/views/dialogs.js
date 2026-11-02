@@ -1,7 +1,8 @@
 /* views/dialogs.js — shared modal flows: export, share link, keyboard help. */
-import { el, icon, copyText, plural } from '../utils.js';
+import { el, icon, copyText, plural, append, setChildren } from '../utils.js';
 import { modal, toast } from '../ui.js';
 import { EXPORT_FORMATS, exportSet, makeShareLink } from '../share.js';
+import { encodeQR, qrSvg, qrCanvas, MAX_QR_BYTES } from '../qr.js';
 
 export function openExportDialog(set) {
   return modal({
@@ -41,15 +42,18 @@ export function openShareDialog(set) {
   return modal({
     title: 'Share this set',
     build: ({ close, body, foot }) => {
-      const status = el('p', { class: 'field__hint' }, 'Building link…');
-      const field = el('input', { class: 'input', readonly: true, 'aria-label': 'Share link' });
+      const status = el('p', { class: 'field__hint share__status' }, 'Building link…');
+      const qrBox = el('div', { class: 'share__qr', 'aria-busy': 'true' }, el('div', { class: 'spinner' }));
+      const field = el('input', { class: 'input', readonly: true, 'aria-label': 'Share link', onclick: e => e.target.select() });
       const copyBtn = el('button', { class: 'btn btn--primary', type: 'button', disabled: true }, icon('copy'), 'Copy link');
+      const nativeBtn = navigator.share ? el('button', { class: 'btn', type: 'button', disabled: true }, icon('link'), 'Send…') : null;
       body.append(
-        el('p', {}, 'The whole set is packed into the link itself, so anyone who opens it gets a copy — no account, no server, nothing uploaded.'),
+        qrBox,
+        el('p', { class: 'share__lede' }, 'Scan with a phone camera, or send the link. The whole set travels inside it — no account, nothing uploaded.'),
         el('div', { class: 'row' }, field),
         status,
       );
-      foot.append(el('button', { class: 'btn', type: 'button', onclick: () => close() }, 'Close'), copyBtn);
+      append(foot, [el('button', { class: 'btn', type: 'button', 'data-autofocus': '', onclick: () => close() }, 'Close'), nativeBtn, copyBtn]);
 
       makeShareLink(set).then(({ url, size, tooLong }) => {
         field.value = url;
@@ -57,15 +61,45 @@ export function openShareDialog(set) {
         copyBtn.onclick = async () => {
           toast(await copyText(url) ? 'Link copied' : 'Could not copy — select the text instead', { type: 'good' });
         };
+        if (nativeBtn) {
+          nativeBtn.disabled = false;
+          nativeBtn.onclick = () => navigator.share({ title: set.title, text: `Study “${set.title}” on StudyLab`, url }).catch(() => {});
+        }
+        paintQR(url);
+        const kb = Math.round(size / 1024 * 10) / 10;
         status.textContent = tooLong
           ? `Heads-up: this link is ${Math.round(size / 1024)} KB. Some apps and browsers cut links off around 30 KB — export a file instead for very large sets.`
-          : `${plural(set.terms.length, 'term')} · ${Math.round(size / 1024 * 10) / 10} KB link`;
+          : `${plural(set.terms.length, 'term')} · ${kb} KB link`;
         if (tooLong) status.style.color = 'var(--c-warn)';
-        field.focus(); field.select();
       }).catch(err => {
+        qrBox.remove();
         status.textContent = `Could not build a link: ${err.message}`;
         status.style.color = 'var(--c-bad)';
       });
+
+      function paintQR(url) {
+        qrBox.removeAttribute('aria-busy');
+        let qr;
+        try { qr = encodeQR(url, { ecl: 'M', minEcl: 'L' }); }
+        catch {
+          qrBox.className = 'share__qr share__qr--none';
+          qrBox.replaceChildren(icon('link'), el('span', {},
+            `This set is too big for a QR code (they hold about ${Math.floor(MAX_QR_BYTES / 1000 * 10) / 10} KB). Send the link instead, or share a smaller set.`));
+          return;
+        }
+        const save = el('button', { class: 'btn btn--sm btn--ghost', type: 'button', onclick: () => {
+          qrCanvas(qr, 10).toBlob(blob => {
+            if (!blob) return;
+            const a = el('a', { href: URL.createObjectURL(blob), download: `${(set.title || 'set').replace(/[^\w-]+/g, '-').slice(0, 50)}-qr.png` });
+            document.body.appendChild(a); a.click(); a.remove();
+            setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+          });
+        } }, icon('download'), 'Save image');
+        setChildren(qrBox,
+          el('div', { class: 'share__qr-code' }, qrSvg(qr, { label: `QR code for “${set.title}”` })),
+          qr.version > 25 ? el('p', { class: 'field__hint' }, 'Big set, dense code — hold the camera close and steady.') : null,
+          save);
+      }
     },
   });
 }

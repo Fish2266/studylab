@@ -9,6 +9,7 @@ import { toast, confirmDialog } from '../ui.js';
 import { navigate } from '../router.js';
 import { grade, distractors } from '../grading.js';
 import { recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
+import { celebrateIfMastered } from '../celebrate.js';
 import { optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
 const LETTERS = 'ABCDEFGHIJ';
@@ -383,7 +384,9 @@ function controller(host, set, progress, session) {
         recordAnswer(progress, q.term.id, !!r.correct, { masteryTarget: masteryTarget() });
       }
     }
+    celebrateIfMastered(set, progress);
     data.saveProgress(progress).catch(err => toast(`Could not save progress: ${err.message}`, { type: 'bad' }));
+    data.recordStudy(countAnswered());
 
     paintResults(perQuestion);
   }
@@ -426,6 +429,7 @@ function controller(host, set, progress, session) {
       } else if (r.afterMiss) {
         progress.cards[q.term.id] = { ...r.afterMiss };
       }
+      celebrateIfMastered(set, progress);
       r.overridden = on;
       r.correct = on;
       r.correctCount = on ? 1 : 0;

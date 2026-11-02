@@ -241,3 +241,9 @@
   .fc-card, .fc-stage { min-height: 200px; height: auto; }
   .main { padding-top: 14px; padding-bottom: 40px; }
 }
+
+/* Keyboard hints ("Press 1 to 4", "Enter to continue") mean nothing without a
+   keyboard; keep their space so the buttons beside them do not jump. */
+@media (hover: none) and (pointer: coarse) {
+  .q-foot__hint { visibility: hidden; }
+}

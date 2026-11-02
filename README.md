@@ -54,10 +54,15 @@ Because storage is per-browser, there are three ways to move sets around:
 | --- | --- |
 | **Download a backup** (Settings) | Everything — sets, folders and study progress — in one JSON file |
 | **Export a set** (set menu → Export) | JSON, CSV, tab-separated, Anki text, or a Markdown table |
-| **Share link** (set menu → Share) | Sending one set to someone else; the whole set is gzip-compressed into the URL fragment, so nothing touches a server |
+| **Share link or QR code** (set page → Share) | Sending one set to someone else; the whole set is gzip-compressed into the URL fragment, so nothing touches a server. The dialog also shows a QR code to scan with a phone camera |
 
 A share link for a 40-card set is about 550 bytes. Very large sets produce long
 URLs — the dialog warns you when a link passes the size most apps will carry.
+QR codes hold up to about 2.9 KB of link (roughly 250–400 short cards); for
+bigger sets the dialog says so and offers the link instead.
+
+Your **study streak** and calendar (days studied, and how much) live alongside
+your sets and are included in backups.
 
 ---
 
@@ -87,7 +92,9 @@ flagged before you import.
 ### Flashcards
 Flip animation, keyboard navigation, shuffle, star cards, hints, autoplay with
 adjustable speed, text-to-speech (per-side, per-language), fullscreen, and
-"know it / still learning" sorting that feeds the set's overall progress.
+"know it / still learning" sorting that feeds the set's overall progress —
+by button, the 1/2 keys, or by swiping the card right (know it) or left (still
+learning) on a phone.
 Filters for starred-only and skip-what-you-know.
 
 ### Learn
@@ -107,6 +114,13 @@ instant feedback or mark-at-the-end, and an optional timer. Graded with a score,
 a per-question review, and a one-click jump into Learn for what you missed.
 "Retake this test" reproduces the exact same paper; "New test" draws fresh
 questions.
+
+### Streaks and the study calendar
+The library shows your current streak and a year-long calendar of study, one
+square per day, shaded by how much you did (answers in Learn and Test, cards in
+Flashcards, pairs in Match). A streak is not lost at midnight — it counts back
+from yesterday until you study today. Mastering every term in a set gets a
+burst of confetti (skipped when reduced motion is on).
 
 ### Match
 Pair terms with definitions against the clock. Wrong pairs add a one-second
@@ -161,6 +175,8 @@ js/grading.js         answer checking and distractor generation
 js/scheduler.js       the Leitner engine behind Learn
 js/importers.js       parsers for CSV/TSV/JSON/Markdown/Anki
 js/share.js           export formats and gzip share links
+js/qr.js              dependency-free QR code encoder (share dialog)
+js/celebrate.js       mastery detection and confetti
 js/speech.js          text-to-speech (degrades to a no-op)
 js/theme.js           appearance, incl. the generated favicon
 js/ui.js              toasts, modals, menus, form primitives

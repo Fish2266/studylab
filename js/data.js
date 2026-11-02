@@ -68,6 +68,7 @@ export const DEFAULT_CARD = Object.freeze({
 });
 
 /* ---------- in-memory caches ---------- */
+let activity = { days: {} };                 // { days: { 'YYYY-MM-DD': answers/cards studied } }
 let settings = structuredCloneSafe(DEFAULT_SETTINGS);
 let index = [];                              // [{id,title,description,count,createdAt,updatedAt,folder}]
 const setCache = new Map();                  // id -> full set (bounded)
@@ -97,6 +98,7 @@ export async function init() {
   const backend = await store.initStorage();
   settings = mergeDefaults(DEFAULT_SETTINGS, await store.kvGet('settings'));
   index = (await store.kvGet('index')) || [];
+  activity = cleanActivity(await store.kvGet('activity'));
   if (!Array.isArray(index)) index = [];
   // Self-heal: if the index is empty but sets exist (or vice versa), rebuild.
   const rows = await store.getAll('sets');
@@ -273,7 +275,7 @@ export async function exportAll() {
   const progress = await store.getAll('progress');
   return {
     app: 'StudyLab', schema: SCHEMA_VERSION, exportedAt: new Date().toISOString(),
-    settings, sets: sets.map(normalizeSet), progress,
+    settings, sets: sets.map(normalizeSet), progress, activity,
   };
 }
 export async function importBackup(data, { mode = 'merge' } = {}) {
@@ -308,6 +310,11 @@ export async function importBackup(data, { mode = 'merge' } = {}) {
   await store.putMany('sets', sets);
   await store.putMany('progress', progressRows);
   if (data.settings && mode === 'replace') await saveSettings(data.settings);
+  if (data.activity) {
+    const inc = cleanActivity(data.activity);
+    activity = mode === 'replace' ? inc : mergeActivity(activity, inc);
+    await store.kvSet('activity', activity);
+  }
   setCache.clear(); progressCache.clear();
   await rebuildIndex();
   return sets.length;
@@ -316,3 +323,85 @@ export async function importBackup(data, { mode = 'merge' } = {}) {
 /* ---------- misc ---------- */export function folders() {
   return [...new Set(index.map(r => r.folder).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 }
+
+/* ---------- study activity: streaks and the calendar heatmap ----------
+ * One number per local calendar day: how many things you studied (answers in
+ * Learn and Test, cards in Flashcards, pairs in Match). Kept in the key-value
+ * store, included in backups, and never tied to a particular set — deleting a
+ * set does not break your streak.
+ */
+export const dayKey = (d = new Date()) => {
+  const x = d instanceof Date ? d : new Date(d);
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`;
+};
+export function parseDay(key) { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d); }
+export function addDays(d, n) { const x = new Date(d.getFullYear(), d.getMonth(), d.getDate()); x.setDate(x.getDate() + n); return x; }
+
+function cleanActivity(raw) {
+  const days = {};
+  const src = raw && typeof raw === 'object' && raw.days && typeof raw.days === 'object' ? raw.days : {};
+  for (const [k, v] of Object.entries(src)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(k) && Number.isFinite(v) && v > 0) days[k] = Math.round(v);
+  }
+  return { days };
+}
+function mergeActivity(a, b) {
+  const days = { ...a.days };
+  for (const [k, v] of Object.entries(b.days)) days[k] = Math.max(days[k] || 0, v);
+  return { days };
+}
+
+export const getActivity = () => activity;
+
+let activityTimer = null;
+function flushActivity() {
+  clearTimeout(activityTimer);
+  activityTimer = null;
+  return store.kvSet('activity', activity).catch(() => { /* not fatal: tomorrow still counts */ });
+}
+if (typeof window !== 'undefined') window.addEventListener('pagehide', () => { if (activityTimer) flushActivity(); });
+
+/**
+ * Count `n` things studied today. Fires a `studylab:streak` event on the first
+ * study of a day so the app can say "3-day streak".
+ */
+export function recordStudy(n = 1, now = new Date()) {
+  if (!(n > 0)) return;
+  const key = dayKey(now);
+  const first = !activity.days[key];
+  activity.days[key] = (activity.days[key] || 0) + Math.round(n);
+  clearTimeout(activityTimer);
+  activityTimer = setTimeout(flushActivity, 600);
+  if (first && key === dayKey() && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('studylab:streak', { detail: streakInfo(activity.days, now) }));
+  }
+}
+
+/**
+ * Current streak counts back from today — or from yesterday if you have not
+ * studied yet today, so the streak is not "lost" at midnight.
+ */
+export function streakInfo(days = activity.days, now = new Date()) {
+  const today = dayKey(now);
+  const has = (d) => (days[dayKey(d)] || 0) > 0;
+  let start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (!has(start)) start = addDays(start, -1);
+  let current = 0;
+  for (let d = start; has(d); d = addDays(d, -1)) current++;
+
+  const keys = Object.keys(days).filter(k => days[k] > 0).sort();
+  let best = 0, run = 0, prev = null;
+  for (const k of keys) {
+    const d = parseDay(k);
+    run = prev && dayKey(addDays(prev, 1)) === k ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = d;
+  }
+  return {
+    current, best: Math.max(best, current),
+    today: days[today] || 0,
+    studiedToday: (days[today] || 0) > 0,
+    totalDays: keys.length,
+  };
+}
+

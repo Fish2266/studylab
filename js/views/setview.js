@@ -56,7 +56,7 @@ function paint(host, set, progress) {
       } },
       null,
       { label: 'Export…', iconName: 'download', onClick: () => openExportDialog(set) },
-      { label: 'Share link…', iconName: 'link', onClick: () => openShareDialog(set) },
+      { label: 'Share or QR code…', iconName: 'link', onClick: () => openShareDialog(set) },
       null,
       { label: 'Reset progress', iconName: 'undo', onClick: resetProgress },
       { label: 'Delete set', iconName: 'trash', danger: true, onClick: remove },
@@ -98,6 +98,7 @@ function paint(host, set, progress) {
       set.description ? el('p', { style: { marginTop: '8px', color: 'var(--c-text-mid)' } }, set.description) : null),
     el('div', { class: 'page-head__actions' },
       el('a', { class: 'btn', href: `#/set/${set.id}/edit` }, icon('pencil'), 'Edit'),
+      set.terms.length ? el('button', { class: 'btn', type: 'button', onclick: () => openShareDialog(set) }, icon('link'), 'Share') : null,
       menuBtn),
   );
 
@@ -112,7 +113,9 @@ function paint(host, set, progress) {
   const progressCard = el('div', { class: 'card card__pad', style: { marginBottom: '18px' } },
     el('div', { class: 'row row--between', style: { marginBottom: '12px' } },
       el('h2', { style: { fontSize: '1rem' } }, 'Your progress'),
-      el('span', { class: 'chip chip--accent' }, `${stats.pct}% mastered`)),
+      stats.pct === 100
+        ? el('span', { class: 'chip chip--good' }, '🎉 All mastered')
+        : el('span', { class: 'chip chip--accent' }, `${stats.pct}% mastered`)),
     segBar(stats),
     el('div', { class: 'legend', style: { marginTop: '10px' } },
       el('span', {}, el('i', { style: { background: 'var(--c-good)' } }), `${stats.mastered} mastered`),

@@ -5,13 +5,14 @@
  * drops the term back and re-queues it inside the same round, so you always
  * finish a round having answered everything correctly at least once.
  */
-import { el, icon, shuffle, isTyping, announce, plural, clamp } from '../utils.js';
+import { el, icon, shuffle, isTyping, announce, plural, clamp, isTouchScreen } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog, segBar } from '../ui.js';
 import { navigate } from '../router.js';
 import { grade, distractors } from '../grading.js';
 import { buildRound, questionKindFor, recordAnswer, ensureCard, overrideAsCorrect } from '../scheduler.js';
 import * as speech from '../speech.js';
+import { celebrateIfMastered } from '../celebrate.js';
 import { openOptions, optionGroup, checkboxRow, selectRow, numberRow, typeRows } from './options.js';
 
 export function render(mount, { params }) {
@@ -56,7 +57,7 @@ function start(host, set, progress, session) {
   const counter = el('span', { class: 'study__counter' });
   const stage = el('div', {});
 
-  const optionsBtn = el('button', { class: 'icon-btn', type: 'button', title: 'Options (O)', 'aria-label': 'Learn options', onclick: showOptions }, icon('cog'));
+  const optionsBtn = el('button', { class: 'icon-btn', type: 'button', title: 'Options (O)', 'aria-label': 'Learn options', onclick: showOptions }, icon('sliders'));
   const restartBtn = el('button', { class: 'icon-btn', type: 'button', title: 'Restart Learn', 'aria-label': 'Restart Learn', onclick: restart }, icon('undo'));
 
   host.append(
@@ -212,7 +213,8 @@ function start(host, set, progress, session) {
     );
     if (opts.speak) speech.speak(q.promptText, { lang: q.promptLang });
 
-    const focusTarget = card.querySelector('.ans-input') || card.querySelector('.opt');
+    // Focusing the first choice helps keyboards, but on a phone its ring looks like a picked answer.
+    const focusTarget = card.querySelector('.ans-input') || (isTouchScreen() ? null : card.querySelector('.opt'));
     if (focusTarget) requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
   }
 
@@ -306,6 +308,8 @@ function start(host, set, progress, session) {
     // Snapshot first, so "I was right" can undo this answer completely.
     q.before = { ...ensureCard(progress, q.term.id) };
     const card = recordAnswer(progress, q.term.id, correct, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+    data.recordStudy(1);
+    celebrateIfMastered(set, progress);      // also clears the flag after a miss
     if (correct) roundStats.right++; else roundStats.wrong++;
     saveProgressSoon();
     paintProgress();
@@ -394,6 +398,7 @@ function start(host, set, progress, session) {
       // streak, so an override could never lead to mastery.
       // The typed wording is accepted for this term from now on.
       overrideAsCorrect(progress, q.term.id, q.before, given, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+      celebrateIfMastered(set, progress);
       roundStats.wrong = Math.max(0, roundStats.wrong - 1);
       roundStats.right++;
       const at = round.lastIndexOf(q.term);

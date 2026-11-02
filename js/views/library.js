@@ -1,9 +1,10 @@
 /* views/library.js — the home screen: search, filter and manage every saved set. */
-import { el, icon, frag, relTime, plural, debounce, truncate } from '../utils.js';
+import { el, icon, frag, relTime, plural, debounce, truncate, isTouchScreen } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog, openMenu } from '../ui.js';
 import { navigate } from '../router.js';
 import { openExportDialog, openShareDialog } from './dialogs.js';
+import { streakCard } from './streak.js';
 
 const PAGE = 24;                     // rows rendered per chunk — keeps 1000-set libraries smooth
 
@@ -18,6 +19,7 @@ export function render(mount) {
   const results = el('div', { class: 'set-grid', id: 'lib-results' });
   const count = el('p', { class: 'page-head__sub' });
   const moreWrap = el('div', { style: { textAlign: 'center', marginTop: '18px' } });
+  const streakSlot = el('div', {});
 
   const search = el('input', {
     class: 'input toolbar__search toolbar__search--wide', type: 'search', placeholder: 'Search sets and terms…',
@@ -58,6 +60,7 @@ export function render(mount) {
         el('a', { class: 'btn btn--primary', href: '#/create' }, icon('plus'), 'Create set'),
       ),
     ),
+    streakSlot,
     el('div', { class: 'toolbar', style: { marginBottom: '16px' } },
       el('div', { class: 'toolbar__controls', style: { marginRight: 'auto' } }, search, sortSel, folderSel),
       viewToggle),
@@ -88,6 +91,9 @@ export function render(mount) {
 
   function paint() {
     paintFolders();
+    // The streak card only makes sense once there is something to study.
+    const hasSets = data.getIndex().length > 0;
+    if (hasSets !== !!streakSlot.firstChild) streakSlot.replaceChildren(...(hasSets ? [streakCard()] : []));
     const rows = filtered();
     const total = data.getIndex().length;
     count.textContent = total === 0 ? 'No sets yet'
@@ -160,6 +166,7 @@ export function render(mount) {
 
     const meta = el('div', { class: 'set-card__meta' },
       el('span', { class: 'chip' }, plural(row.count, 'term')),
+      masteryChip(row),
       row.folder ? el('span', { class: 'chip' }, icon('folder'), row.folder) : null,
       el('span', {}, 'Edited ' + relTime(row.updatedAt)),
     );
@@ -181,6 +188,27 @@ export function render(mount) {
       meta);
   }
 
+  /** "60% mastered" for sets you have started; filled in once progress loads. */
+  function masteryChip(row) {
+    const chip = el('span', { class: 'chip chip--mastery', hidden: true });
+    if (!row.count) return chip;
+    data.getProgress(row.id).then(p => {
+      let mastered = 0, started = 0;
+      for (const c of Object.values(p.cards)) {
+        if (!c || c.status === 'new') continue;
+        started++;
+        if (c.status === 'mastered') mastered++;
+      }
+      if (!started) return;
+      const pct = Math.min(100, Math.round((mastered / row.count) * 100));
+      chip.textContent = pct === 100 ? '🎉 Mastered' : `${pct}% mastered`;
+      chip.classList.toggle('chip--good', pct === 100);
+      chip.style.setProperty('--pct', pct + '%');
+      chip.hidden = false;
+    }).catch(() => {});
+    return chip;
+  }
+
   function cardMenu(row) {
     return [
       { label: 'Study', iconName: 'brain', onClick: () => navigate(`/set/${row.id}`) },
@@ -188,7 +216,7 @@ export function render(mount) {
       null,
       { label: 'Duplicate', iconName: 'copy', onClick: () => dup(row) },
       { label: 'Export…', iconName: 'download', onClick: async () => { const set = await data.getSet(row.id); set && openExportDialog(set); } },
-      { label: 'Share link…', iconName: 'link', onClick: async () => { const set = await data.getSet(row.id); set && openShareDialog(set); } },
+      { label: 'Share or QR code…', iconName: 'link', onClick: async () => { const set = await data.getSet(row.id); set && openShareDialog(set); } },
       null,
       { label: 'Delete', iconName: 'trash', danger: true, onClick: () => remove(row) },
     ];
@@ -223,7 +251,8 @@ export function render(mount) {
   }
 
   paint();
-  requestAnimationFrame(() => { if (data.getIndex().length > 6) search.focus({ preventScroll: true }); });
+  // Jump straight to search in a big library — but not on phones, where it would pop the keyboard up.
+  requestAnimationFrame(() => { if (data.getIndex().length > 6 && !isTouchScreen()) search.focus({ preventScroll: true }); });
 
   return { destroy() { onSearch.cancel(); } };
 }

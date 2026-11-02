@@ -9,7 +9,7 @@
  * the cache. Study data is NOT here — that lives in IndexedDB and is never
  * cached or uploaded.
  */
-const VERSION = 'studylab-v7';
+const VERSION = 'studylab-v8';
 const SCOPE = new URL(self.registration.scope);
 
 const SHELL = [
@@ -30,6 +30,8 @@ const SHELL = [
   'js/speech.js',
   'js/importers.js',
   'js/share.js',
+  'js/qr.js',
+  'js/celebrate.js',
   'js/views/library.js',
   'js/views/setview.js',
   'js/views/editor.js',
@@ -42,6 +44,7 @@ const SHELL = [
   'js/views/shared.js',
   'js/views/dialogs.js',
   'js/views/options.js',
+  'js/views/streak.js',
 ].map(p => new URL(p, SCOPE).href);
 
 self.addEventListener('install', (event) => {
