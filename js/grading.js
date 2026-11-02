@@ -120,7 +120,53 @@ export function grade(userAnswer, expected, opts = {}) {
   }
   result.distance = best;
   result.close = best <= tolerance;
+  if (!result.close && variants.some(v => keyIdeasMatch(user, v))) {
+    result.close = true;
+    result.keywords = true;     // right ideas, different wording
+  }
   return result;
+}
+
+/* ---------- "in your own words": key-idea matching for definitions ----------
+ * Typo tolerance cannot accept a reworded definition. For answers with at
+ * least three content words, count it when the learner's answer contains
+ * nearly all of them (in any order, any word form) without padding the answer
+ * out or flipping its meaning with a "not". Short answers never qualify — a
+ * single shared word is not an answer.
+ */
+const STOP = new Set(('a an the and or but of to in on at by for from with as is are was were be been being it its this that ' +
+  'these those which what who whom whose where when how why than then so such very can could will would should may might must ' +
+  'do does did has have had into onto over under about between through during before after above below up down out off ' +
+  'also just only most more some any each other another their there they them he she his her we you your our i me my ' +
+  'something someone thing things one ones type kind way used use uses using called known').split(' '));
+const NEGATION = /\b(not|no|never|without|cannot|cant|dont|doesnt|isnt|arent|wont|neither|nor|non)\b/;
+
+function stem(w) {
+  if (w.length > 4 && w.endsWith('ies')) return w.slice(0, -3) + 'y';
+  if (w.length > 5 && w.endsWith('ing')) return w.slice(0, -3);
+  if (w.length > 4 && w.endsWith('ed')) return w.slice(0, -2);
+  if (w.length > 4 && w.endsWith('es') && /(s|x|z|ch|sh)es$/.test(w)) return w.slice(0, -2);
+  if (w.length > 3 && w.endsWith('s') && !w.endsWith('ss')) return w.slice(0, -1);
+  return w;
+}
+export function contentWords(normalized) {
+  return [...new Set(String(normalized).split(' ').filter(w => w.length > 1 && !STOP.has(w)).map(stem))];
+}
+function sameWord(a, b) {
+  if (a === b) return true;
+  const [s, l] = a.length <= b.length ? [a, b] : [b, a];
+  if (s.length >= 3 && l.startsWith(s)) return true;               // fit ~ fitness, produce ~ production
+  return s.length >= 5 && editDistance(a, b, 1) <= 1;               // one slip in a longer word
+}
+/** Both arguments already normalised (smart level). */
+export function keyIdeasMatch(user, expected) {
+  const want = contentWords(expected);
+  if (want.length < 3) return false;
+  const have = contentWords(user);
+  if (have.length > Math.ceil(want.length * 1.5) + 2) return false; // no dumping every word you know
+  if (NEGATION.test(user) !== NEGATION.test(expected)) return false;
+  const hits = want.filter(w => have.some(h => sameWord(w, h))).length;
+  return hits / want.length >= 0.75;
 }
 
 /** Cheap dedupe key — full `normalize` is far too expensive to run over a

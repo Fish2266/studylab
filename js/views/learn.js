@@ -280,7 +280,7 @@ function start(host, set, progress, session) {
     if (answered || busy) return;
     answered = true;
 
-    let correct = false, close = false, given = '';
+    let correct = false, close = false, given = '', ownWords = false;
     if (dontKnow) {
       correct = false;
       given = '';
@@ -302,7 +302,10 @@ function start(host, set, progress, session) {
       });
       correct = g.correct;
       close = !g.correct && g.close;
-      if (close && opts.acceptTypos) correct = true;
+      ownWords = close && !!g.keywords;
+      // Typos follow the "accept typos" setting; a definition in your own
+      // words with the key ideas is simply right.
+      if (close && (opts.acceptTypos || ownWords)) correct = true;
     }
 
     // Snapshot first, so "I was right" can undo this answer completely.
@@ -321,10 +324,10 @@ function start(host, set, progress, session) {
       roundStats.total = round.length;
     }
 
-    showVerdict({ correct, close, given, dontKnow, selfGraded, card });
+    showVerdict({ correct, close, given, dontKnow, selfGraded, card, ownWords });
   }
 
-  function showVerdict({ correct, close, given, dontKnow, selfGraded }) {
+  function showVerdict({ correct, close, given, dontKnow, selfGraded, ownWords }) {
     const card = stage.querySelector('.q-card');
     if (!card) return;
 
@@ -346,16 +349,16 @@ function start(host, set, progress, session) {
     const input = card.querySelector('.ans-input');
     if (input) {
       input.readOnly = true;
-      input.classList.add(correct ? 'is-correct' : close ? 'is-close' : 'is-wrong');
+      input.classList.add(correct && (!close || ownWords) ? 'is-correct' : close ? 'is-close' : 'is-wrong');
     }
     const submitBtn = card.querySelector('button[type="submit"]');
     if (submitBtn) submitBtn.disabled = true;
     card.querySelectorAll('.q-foot .btn').forEach(b => b.remove());
 
     const canOverride = !correct && !selfGraded && q.kind === 'written' && !dontKnow && given.trim();
-    const kindClass = correct ? (close ? 'close' : 'good') : 'bad';
+    const kindClass = correct ? (close && !ownWords ? 'close' : 'good') : 'bad';
     const heading = correct
-      ? (close ? 'Correct, but check the spelling' : 'Correct')
+      ? (ownWords ? 'Correct — in your own words' : close ? 'Correct, but check the spelling' : 'Correct')
       : dontKnow ? 'No problem, here it is' : 'Not quite';
 
     const verdict = el('div', { class: `verdict verdict--${kindClass}`, role: 'status' },
@@ -397,15 +400,20 @@ function start(host, set, progress, session) {
       // record a correct answer. Previously the miss had already reset the
       // streak, so an override could never lead to mastery.
       // The typed wording is accepted for this term from now on.
-      overrideAsCorrect(progress, q.term.id, q.before, given, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
-      celebrateIfMastered(set, progress);
+      const c = overrideAsCorrect(progress, q.term.id, q.before, given, { masteryTarget: opts.masteryTarget, penalty: opts.penalty });
+      const toGo = Math.max(0, opts.masteryTarget - c.streak);
       roundStats.wrong = Math.max(0, roundStats.wrong - 1);
       roundStats.right++;
       const at = round.lastIndexOf(q.term);
       if (at > roundIndex) { round.splice(at, 1); roundStats.total = round.length; }
       saveProgressSoon();
       paintProgress();
-      toast('Marked correct', { type: 'good', timeout: 1600 });
+      // Say where the term stands: one override is one right answer, and mastery
+      // takes `masteryTarget` in a row — "Marked correct" alone read as "done".
+      if (!celebrateIfMastered(set, progress)) {
+        toast(c.status === 'mastered' ? 'Marked correct — term mastered'
+          : `Marked correct — ${plural(toGo, 'more right answer')} to master it. Your wording is saved.`, { type: 'good', timeout: 3200 });
+      }
       advance();
     }
   }

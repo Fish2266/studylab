@@ -38,6 +38,9 @@ No build step: edit files, reload.
 - `js/qr.js` is a hand-written QR encoder. If you touch it, re-verify with a
   real decoder (jsQR from npm, in a scratch dir — not in the app) and update
   the fingerprint in the tests page.
+- Smart grading also accepts definitions "in your own words" (`keyIdeasMatch` in
+  `grading.js`: ≥75% of 3+ content words, no padding, same negation). Add a
+  should-stay-wrong case to the tests for any loosening.
 - Learn's "I was right" relies on `q.before` (card snapshot taken before
   `recordAnswer`) and stores the typed wording in `card.accepted`.
 - Safe Browsing treats all of `fish2266.github.io` as one site; a flag on any

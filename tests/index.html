@@ -55,6 +55,23 @@ test('grading: smart matching', async () => {
   eq(r('my own words', 'official definition text here', { accepted: ['my own words'] }), 'correct', 'remembered override');
 });
 
+test('grading: definitions in your own words (key ideas)', async () => {
+  const { grade } = await import('../js/grading.js');
+  const r = (u, e, o) => { const x = grade(u, e, o || {}); return x.correct ? 'correct' : x.keywords ? 'own words' : x.close ? 'close' : 'wrong'; };
+  const def = 'measures fitness difference between a genotype and the most fit genotype';
+  eq(r('difference in fitness between a genotype and the fittest genotype', def), 'own words');
+  eq(r('controls what can enter and leave', 'controls what enters and leaves'), 'own words');
+  eq(r('treaty that lowers trade barriers between nations', 'a treaty between nations that lowers barriers to trade'), 'own words');
+  eq(r('the war ended in 1918 after germany surrendered', 'war that ended in 1918 with the surrender of germany'), 'own words');
+  // must stay wrong
+  eq(r('measures how big a population is', def), 'wrong', 'different idea');
+  eq(r('cell', 'the powerhouse of the cell'), 'wrong', 'short answers need the real thing');
+  eq(r('does not allow water to pass through the membrane', 'allows water to pass through the membrane'), 'wrong', 'negation flips meaning');
+  eq(r('war started 1914 germany', 'war that ended in 1918 with the surrender of germany'), 'wrong');
+  eq(r('dna rna protein cell nucleus mitochondria ribosome energy membrane enzyme gene', 'the nucleus holds the dna of the cell'), 'wrong', 'keyword dump');
+  eq(r('controls what can enter and leave', 'controls what enters and leaves', { smart: false }), 'wrong', 'only with smart grading');
+});
+
 test('distractors never leak the answer or repeat', async () => {
   const { distractors } = await import('../js/grading.js');
   const pool = Array.from({ length: 500 }, (_, i) => `definition ${i}`);

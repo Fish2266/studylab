@@ -335,7 +335,9 @@ function controller(host, set, progress, session) {
       requireExact: !opts.smartGrading, smart: opts.smartGrading,
       accepted: (progress.cards[q.term.id] || {}).accepted,     // wordings you marked right before
     });
-    return { correct: g.correct, close: g.close, given: given ?? '', total: 1, correctCount: g.correct ? 1 : 0 };
+    // Smart grading also accepts a definition in your own words (key ideas match).
+    const correct = g.correct || (opts.smartGrading && !!g.keywords);
+    return { correct, close: g.close, ownWords: !g.correct && correct, given: given ?? '', total: 1, correctCount: correct ? 1 : 0 };
   }
 
   function markOne(q, card) {
@@ -486,7 +488,7 @@ function controller(host, set, progress, session) {
     card.appendChild(el('div', { class: `verdict verdict--${allRight ? 'good' : 'bad'}` },
       el('span', { class: 'verdict__icon' }, icon(allRight ? 'check' : 'x')),
       el('div', { class: 'verdict__body' },
-        el('div', { class: 'verdict__h' }, r.overridden ? 'Marked correct' : allRight ? 'Correct' : 'Incorrect'),
+        el('div', { class: 'verdict__h' }, r.overridden ? 'Marked correct' : r.ownWords ? 'Correct — in your own words' : allRight ? 'Correct' : 'Incorrect'),
         r.overridden ? el('div', {}, 'You answered ', el('strong', {}, givenText))
           : allRight ? null : el('div', {}, 'You answered ', el('span', { class: 'strike' }, givenText)),
         el('div', { class: 'verdict__ans' }, el('strong', {}, 'Answer: '), q.kind === 'truefalse' ? (q.expectTrue ? 'True' : 'False') : q.answerText),
