@@ -45,6 +45,15 @@ No build step: edit files, reload.
   'wrong'|'skip'|'override')`, then `buddy()`/`hero()`/`snowman()` to draw.
   Those return null when switched off — pass them through `el()`/`setChildren()`.
   He goes beside existing feedback only, never over a question or in a popup.
+- **Colours.** Text tokens are tuned to ≥ 4.5:1 in both themes (tests check
+  them). Coloured text uses `--c-good` / `--c-bad` / `--c-warn-text` — not
+  `--c-warn`, which is for bars and borders. Accent lightness and the text on
+  it are picked per hue by `accentTones()` in `theme.js`; don't hard-code `#fff`
+  on the accent.
+- **Buttons.** Variants set `--btn-bg` / `--btn-bg-hover`; never set `background`
+  directly in a `:hover` rule — that once blanked every hovered primary button.
+- UI audit script idea: drive every screen at 375/1200/dark and check cut text,
+  overflow, overlaps, contrast, tap targets (see git log for the Nov 2026 audit).
 - Learn's "I was right" relies on `q.before` (card snapshot taken before
   `recordAnswer`) and stores the typed wording in `card.accepted`.
 - Safe Browsing treats all of `fish2266.github.io` as one site; a flag on any

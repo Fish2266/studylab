@@ -10,6 +10,41 @@ export const ACCENTS = [
   { hue: 350, name: 'Rose' },
 ];
 
+/* ---------- readable accents ----------
+ * The accent is one hue at fixed saturation/lightness, so white text on it is
+ * fine for Indigo but unreadable for Teal or Green (under 2:1). For the light
+ * theme, pick per hue: white text if it reads (≥ 4.5:1), otherwise dark text,
+ * otherwise deepen the accent until white reads. Same for the accent-coloured
+ * text used on pale accent backgrounds. Dark theme already uses dark-on-light.
+ */
+const hslToRgb = (h, s, l) => {
+  s /= 100; l /= 100;
+  const k = (n) => (n + h / 30) % 12, a = s * Math.min(l, 1 - l);
+  const f = (n) => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
+  return [f(0), f(8), f(4)];
+};
+const luminance = ([r, g, b]) => {
+  const c = (x) => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+  return 0.2126 * c(r) + 0.7152 * c(g) + 0.0722 * c(b);
+};
+export const contrast = (a, b) => { const A = luminance(a), B = luminance(b); return (Math.max(A, B) + 0.05) / (Math.min(A, B) + 0.05); };
+
+/** @returns {{l:number, fg:string, textL:number}} lightness %, button text colour, accent-text lightness % */
+export function accentTones(hue, sat = 62) {
+  const WHITE = [1, 1, 1], AA = 4.5;
+  const dark = hslToRgb(hue, 60, 12);
+  let l = 58, fg = '#fff';
+  if (contrast(WHITE, hslToRgb(hue, sat, l)) < AA) {
+    if (contrast(dark, hslToRgb(hue, sat, l)) >= AA) fg = `hsl(${hue} 60% 12%)`;
+    else while (l > 30 && contrast(WHITE, hslToRgb(hue, sat, l)) < AA) l--;
+  }
+  // accent-coloured text must read on the pale accent background and on white
+  let textL = 42;
+  const soft = hslToRgb(hue, sat, 96);
+  while (textL > 20 && (contrast(hslToRgb(hue, sat, textL), soft) < AA || contrast(hslToRgb(hue, sat, textL), WHITE) < AA)) textL--;
+  return { l, fg, textL };
+}
+
 const media = window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)') : null;
 let currentPreference = 'system';
 
@@ -43,6 +78,10 @@ export function applyAppearance(settings) {
   // set the theme and the status bar synchronously on the next visit.
   try { localStorage.setItem('studylab:theme', currentPreference); } catch { /* private mode */ }
   root.style.setProperty('--accent-h', String(settings.accentHue ?? 245));
+  const tones = accentTones(settings.accentHue ?? 245);
+  root.style.setProperty('--accent-l', tones.l + '%');
+  root.style.setProperty('--accent-fg', tones.fg);
+  root.style.setProperty('--accent-text-l', tones.textL + '%');
   applyFavicon(settings.accentHue ?? 245);
   root.style.setProperty('--fs-scale', String(settings.fontScale ?? 1));
   root.dataset.readfont = settings.readFont || 'sans';

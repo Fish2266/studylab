@@ -284,6 +284,79 @@ test('Flurry: switched off means gone everywhere', async () => {
   } finally { s.mascot = before; }
 });
 
+// A frame that loads the app's real stylesheets (but not the app), for layout and colour checks.
+async function styledFrame(width = 375, theme = 'light') {
+  const f = document.createElement('iframe');
+  f.style.cssText = `position:absolute;left:-9999px;top:0;width:${width}px;height:900px;border:0`;
+  f.srcdoc = `<!DOCTYPE html><html data-theme="${theme}"><head><link rel="stylesheet" href="${new URL('../css/app.css', location)}"><link rel="stylesheet" href="${new URL('../css/modes.css', location)}"><link rel="stylesheet" href="${new URL('../css/mobile.css', location)}"></head><body><main class="main"></main></body></html>`;
+  document.body.appendChild(f);
+  await new Promise(r => f.onload = r);
+  await Promise.all([...f.contentDocument.querySelectorAll('link')].map(l => l.sheet ? 0 : new Promise(r => { l.onload = r; l.onerror = r; })));
+  return f;
+}
+const rgbOf = (s) => s.match(/[\d.]+/g).slice(0, 3).map(n => +n / 255);
+
+test('calendar: today\'s ring is never clipped (phone and desktop)', async () => {
+  const { heatmap } = await import('../js/views/streak.js');
+  const { dayKey } = await import('../js/data.js');
+  for (const w of [375, 1200]) {
+    const f = await styledFrame(w);
+    try {
+      const now = new Date(2026, 10, 7);                 // a Saturday: today is the bottom-right square
+      const h = heatmap({ [dayKey(now)]: 40 }, now);
+      f.contentDocument.importNode(h, true);
+      const host = f.contentDocument.createElement('div'); host.style.width = (w - 32) + 'px'; host.appendChild(f.contentDocument.adoptNode(h));
+      f.contentDocument.querySelector('main').appendChild(host);
+      const t = f.contentDocument.querySelector('.is-today').getBoundingClientRect();
+      const c = f.contentDocument.querySelector('.heat__clip').getBoundingClientRect();
+      const ring = 2.5;                                   // outline 1.5px + offset 1px
+      ok(t.right + ring <= c.right + 0.5 && t.bottom + ring <= c.bottom + 0.5 && t.top - ring >= c.top - 0.5, `${w}px: ring fits (cell ${t.right},${t.bottom} clip ${c.right},${c.bottom})`);
+    } finally { f.remove(); }
+  }
+});
+
+test('buttons: hovering never replaces a variant\'s colour (the blank-button bug)', async () => {
+  const f = await styledFrame();
+  try {
+    const flat = (r) => (!r.selectorText && r.cssRules ? [...r.cssRules].flatMap(flat) : [r]);   // style rules have (empty) cssRules too, so check selectorText
+    const rules = [...f.contentDocument.styleSheets].flatMap(sh => [...sh.cssRules].flatMap(flat));
+    const hovers = rules.filter(r => r.selectorText && /(^|,\s*)\.btn:hover\b/.test(r.selectorText));
+    ok(hovers.length, 'found .btn:hover');
+    for (const r of hovers) {
+      // read the rule text: shorthand values built from var() come back empty from getPropertyValue
+      const m = r.cssText.match(/background(?:-color)?\s*:\s*([^;]+)/);
+      ok(!m || /var\(--btn-bg(-hover)?\)/.test(m[1]), `.btn:hover must use the variant's variable, got "${m && m[1]}" in ${r.selectorText}`);
+    }
+  } finally { f.remove(); }
+});
+
+test('colours: text tokens meet 4.5:1 in both themes', async () => {
+  const { contrast } = await import('../js/theme.js');
+  for (const theme of ['light', 'dark']) {
+    const f = await styledFrame(375, theme);
+    try {
+      const probe = (fg, bg) => { const d = f.contentDocument.createElement('div'); d.style.cssText = `color:var(${fg});background:var(${bg})`; f.contentDocument.body.appendChild(d); const s = getComputedStyle(d); const r = contrast(rgbOf(s.color), rgbOf(s.backgroundColor)); d.remove(); return r; };
+      for (const [fg, bg] of [['--c-text-dim', '--c-bg'], ['--c-text-dim', '--c-surface-2'], ['--c-text-mid', '--c-bg'], ['--c-good', '--c-good-bg'],
+                              ['--c-bad', '--c-bad-bg'], ['--c-warn-text', '--c-warn-bg'], ['--c-accent-fg', '--c-accent'], ['--c-accent-text', '--c-accent-soft']]) {
+        const r = probe(fg, bg);
+        ok(r >= 4.5, `${theme}: ${fg} on ${bg} is ${r.toFixed(2)}:1`);
+      }
+    } finally { f.remove(); }
+  }
+});
+
+test('colours: every accent choice gets readable button text', async () => {
+  const { ACCENTS, accentTones, contrast } = await import('../js/theme.js');
+  const hsl = (h, s, l) => { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); return [f(0), f(8), f(4)]; };
+  for (const { hue, name } of ACCENTS) {
+    const t = accentTones(hue);
+    const fg = t.fg === '#fff' ? [1, 1, 1] : hsl(hue, 60, 12);
+    ok(contrast(fg, hsl(hue, 62, t.l)) >= 4.5, `${name}: button text ${contrast(fg, hsl(hue, 62, t.l)).toFixed(2)}`);
+    ok(contrast(hsl(hue, 62, t.textL), hsl(hue, 62, 96)) >= 4.5, `${name}: accent text on pale accent`);
+  }
+  eq(accentTones(245), { l: 58, fg: '#fff', textL: 42 }, 'default indigo is unchanged');
+});
+
 test('importers: real-world formats', async () => {
   const { parseAny } = await import('../js/importers.js');
   eq(parseAny('a\tone\nb\ttwo').terms.length, 2, 'quizlet tsv');

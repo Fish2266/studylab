@@ -67,9 +67,9 @@
 .fc-sort { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
 .fc-sort .btn { min-width: 150px; }
 .fc-sort .btn--know { --btn-fg: var(--c-good); --btn-bd: var(--c-good-line); }
-.fc-sort .btn--know:hover { background: var(--c-good-bg); }
-.fc-sort .btn--still { --btn-fg: var(--c-warn); --btn-bd: var(--c-warn); }
-.fc-sort .btn--still:hover { background: var(--c-warn-bg); }
+.fc-sort .btn--know { --btn-bg-hover: var(--c-good-bg); }
+.fc-sort .btn--still { --btn-fg: var(--c-warn-text); --btn-bd: var(--c-warn); }
+.fc-sort .btn--still { --btn-bg-hover: var(--c-warn-bg); }
 
 /* ---- Question surface (Learn + Test) ---- */
 .q-card { background: var(--c-surface); border: 1px solid var(--c-border); border-radius: var(--r-xl); box-shadow: var(--shadow-1); padding: 22px 24px 18px; }
@@ -266,6 +266,6 @@
   padding: .3em .8em; border-radius: var(--r-sm); font-weight: 760; font-size: .95rem; letter-spacing: .02em;
   border: 2px solid currentColor; background: var(--c-surface); }
 .fc-swipe__tag--right { left: 18px; color: var(--c-good); transform: rotate(-8deg); }
-.fc-swipe__tag--left { right: 18px; color: var(--c-warn); transform: rotate(8deg); }
+.fc-swipe__tag--left { right: 18px; color: var(--c-warn-text); transform: rotate(8deg); }
 .fc-sort__hint { flex-basis: 100%; text-align: center; font-size: .78rem; color: var(--c-text-dim); margin: 2px 0 0; display: none; }
 @media (hover: none) and (pointer: coarse) { .fc-sort__hint { display: block; } }

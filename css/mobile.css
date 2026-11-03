@@ -19,7 +19,6 @@
   .opt:hover:not([disabled]) { border-color: var(--c-border-strong); background: var(--c-surface); }
   .opt:hover:not([disabled]) .opt__key { background: var(--c-surface-2); color: var(--c-text-dim); border-color: var(--c-border); }
   .btn:hover { background: var(--btn-bg); border-color: var(--btn-bd); }
-  .btn--primary:hover { --btn-bg: var(--c-accent); }
   .icon-btn:hover { background: transparent; color: var(--c-text-mid); }
   .icon-btn[aria-pressed="true"]:hover { color: var(--c-accent-text); background: var(--c-accent-soft); }
   .menu button:hover { background: none; }
@@ -46,6 +45,8 @@
   .brand { position: relative; }
   .brand::after { content: ''; position: absolute; top: 50%; left: -6px; width: 44px; height: 44px; transform: translateY(-50%); }
   .toast__x { padding: 8px 10px; margin: -8px -6px -8px auto; }
+  /* sliders: the 16px track is hard to grab with a thumb */
+  .range { height: 32px; }
 }
 
 /* iOS zooms the whole page when you focus a control whose text is under 16px,

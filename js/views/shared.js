@@ -42,7 +42,7 @@ function paint(host, payload) {
         el('span', { class: 'chip chip--accent' }, icon('link'), 'Shared set'),
         el('h1', { style: { marginTop: '8px' } }, payload.title),
         payload.description ? el('p', { class: 'page-head__sub' }, payload.description) : null,
-        el('p', { class: 'page-head__sub' }, `${plural(usable.length, 'card')} · nothing is saved until you choose to`))),
+        el('p', { class: 'page-head__sub' }, `${plural(usable.length, 'card')} · nothing is saved until you add it to your library`))),
 
     el('div', { class: 'row', style: { marginBottom: '18px' } }, saveBtn,
       el('a', { class: 'btn', href: '#/' }, 'Not now')),

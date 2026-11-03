@@ -7,13 +7,14 @@
 :root {
   --accent-h: 245; --accent-s: 62%;
 
-  --c-accent:        hsl(var(--accent-h) var(--accent-s) 58%);
-  --c-accent-hover:  hsl(var(--accent-h) var(--accent-s) 52%);
-  --c-accent-press:  hsl(var(--accent-h) var(--accent-s) 46%);
-  --c-accent-fg:     #fff;
+  /* --accent-l / --accent-fg / --accent-text-l are set per hue by theme.js so text on the accent always reads */
+  --c-accent:        hsl(var(--accent-h) var(--accent-s) var(--accent-l, 58%));
+  --c-accent-hover:  hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l, 58%) - 6%));
+  --c-accent-press:  hsl(var(--accent-h) var(--accent-s) calc(var(--accent-l, 58%) - 12%));
+  --c-accent-fg:     var(--accent-fg, #fff);
   --c-accent-soft:   hsl(var(--accent-h) var(--accent-s) 96%);
   --c-accent-line:   hsl(var(--accent-h) var(--accent-s) 86%);
-  --c-accent-text:   hsl(var(--accent-h) var(--accent-s) 42%);
+  --c-accent-text:   hsl(var(--accent-h) var(--accent-s) var(--accent-text-l, 42%));
 
   --c-bg:       hsl(240 20% 97%);
   --c-surface:  #fff;
@@ -22,16 +23,17 @@
   --c-border:   hsl(240 14% 89%);
   --c-border-strong: hsl(240 12% 80%);
   --c-text:     hsl(232 22% 14%);
-  --c-text-mid: hsl(232 10% 40%);
-  --c-text-dim: hsl(232 8% 54%);
+  --c-text-mid: hsl(232 10% 38%);
+  --c-text-dim: hsl(232 8% 45%);       /* ≥ 4.5:1 on every light surface */
 
-  --c-good:     hsl(152 58% 38%);
+  --c-good:     hsl(152 58% 31%);
   --c-good-bg:  hsl(152 60% 95%);
   --c-good-line:hsl(152 45% 78%);
-  --c-bad:      hsl(356 66% 52%);
+  --c-bad:      hsl(356 66% 46%);
   --c-bad-bg:   hsl(356 80% 97%);
   --c-bad-line: hsl(356 70% 88%);
   --c-warn:     hsl(36 85% 44%);
+  --c-warn-text:hsl(32 90% 31%);       /* amber that reads as text; --c-warn stays for bars and borders */
   --c-warn-bg:  hsl(42 92% 95%);
   --c-star:     hsl(43 92% 48%);
 
@@ -57,7 +59,7 @@ html[data-theme="dark"] {
   --c-accent:        hsl(var(--accent-h) 72% 66%);
   --c-accent-hover:  hsl(var(--accent-h) 72% 72%);
   --c-accent-press:  hsl(var(--accent-h) 72% 60%);
-  --c-accent-fg:     hsl(var(--accent-h) 60% 12%);
+  --c-accent-fg:     hsl(var(--accent-h) 60% 8%);
   --c-accent-soft:   hsl(var(--accent-h) 34% 20%);
   --c-accent-line:   hsl(var(--accent-h) 32% 34%);
   --c-accent-text:   hsl(var(--accent-h) 76% 76%);
@@ -70,7 +72,7 @@ html[data-theme="dark"] {
   --c-border-strong: hsl(230 10% 34%);
   --c-text:     hsl(228 24% 94%);
   --c-text-mid: hsl(228 12% 72%);
-  --c-text-dim: hsl(228 9% 58%);
+  --c-text-dim: hsl(228 9% 62%);
 
   --c-good:     hsl(152 52% 58%);
   --c-good-bg:  hsl(152 34% 17%);
@@ -79,6 +81,7 @@ html[data-theme="dark"] {
   --c-bad-bg:   hsl(356 36% 19%);
   --c-bad-line: hsl(356 32% 34%);
   --c-warn:     hsl(40 88% 62%);
+  --c-warn-text:var(--c-warn);
   --c-warn-bg:  hsl(40 32% 18%);
 
   --shadow-1: 0 1px 2px hsl(0 0% 0% / .4);
@@ -119,6 +122,7 @@ h1 { font-size: 1.85rem; } h2 { font-size: 1.3rem; } h3 { font-size: 1.05rem; }
 p { margin: 0 0 .7em; }
 a { color: var(--c-accent-text); text-decoration: none; }
 a:hover { text-decoration: underline; }
+a.btn:hover, a.icon-btn:hover { text-decoration: none; }   /* link-buttons are buttons, not text links */
 button, input, select, textarea { font: inherit; color: inherit; }
 img { max-width: 100%; display: block; }
 svg { display: block; }
@@ -155,6 +159,7 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
 /* ---------- 3. Primitives ---------- */
 .btn {
   --btn-bg: var(--c-surface); --btn-fg: var(--c-text); --btn-bd: var(--c-border-strong);
+  --btn-bg-hover: var(--c-surface-2);
   display: inline-flex; align-items: center; justify-content: center; gap: .5em;
   padding: .55em 1.05em; min-height: 40px;
   font-size: .95rem; font-weight: 600; letter-spacing: -.005em;
@@ -163,19 +168,22 @@ html[data-motion="reduced"] *, html[data-motion="reduced"] *::before, html[data-
   cursor: pointer; user-select: none; white-space: nowrap;
   transition: background var(--dur-1), border-color var(--dur-1), transform var(--dur-1), box-shadow var(--dur-1), color var(--dur-1);
 }
-.btn:hover { background: var(--c-surface-2); border-color: var(--c-border-strong); }
+/* Hover goes through a variable too: a hard-coded background here used to beat every variant,
+   so a hovered primary button turned near-white with white text — the label vanished. */
+.btn:hover { background: var(--btn-bg-hover); border-color: var(--btn-bd); }
 .btn:active { transform: translateY(1px); }
 .btn[disabled], .btn[aria-disabled="true"] { opacity: .45; pointer-events: none; }
 .btn svg { width: 1.15em; height: 1.15em; flex: none; }
 
 .btn--primary { --btn-bg: var(--c-accent); --btn-fg: var(--c-accent-fg); --btn-bd: transparent; box-shadow: var(--shadow-1); }
-.btn--primary:hover { --btn-bg: var(--c-accent-hover); }
-.btn--primary:active { --btn-bg: var(--c-accent-press); }
+.btn--primary { --btn-bg-hover: var(--c-accent-hover); }
+.btn--primary:active { --btn-bg: var(--c-accent-press); --btn-bg-hover: var(--c-accent-press); }
 .btn--ghost { --btn-bg: transparent; --btn-bd: transparent; color: var(--c-text-mid); }
 .btn--ghost:hover { background: var(--c-surface-2); color: var(--c-text); }
-.btn--soft { --btn-bg: var(--c-accent-soft); --btn-fg: var(--c-accent-text); --btn-bd: transparent; }
+.btn--soft { --btn-bg: var(--c-accent-soft); --btn-fg: var(--c-accent-text); --btn-bd: transparent;
+  --btn-bg-hover: color-mix(in srgb, var(--c-accent-soft) 82%, var(--c-accent)); }
 .btn--danger { --btn-fg: var(--c-bad); --btn-bd: var(--c-bad-line); }
-.btn--danger:hover { background: var(--c-bad-bg); }
+.btn--danger { --btn-bg-hover: var(--c-bad-bg); }
 .btn--sm { min-height: 32px; padding: .3em .7em; font-size: .85rem; border-radius: var(--r-sm); }
 .btn--lg { min-height: 50px; padding: .7em 1.6em; font-size: 1.02rem; border-radius: var(--r-lg); }
 .btn--block { width: 100%; }
@@ -233,7 +241,7 @@ html[data-theme="dark"] .segment button[aria-pressed="true"] { background: var(-
 }
 .chip--good { background: var(--c-good-bg); color: var(--c-good); border-color: var(--c-good-line); }
 .chip--bad  { background: var(--c-bad-bg);  color: var(--c-bad);  border-color: var(--c-bad-line); }
-.chip--warn { background: var(--c-warn-bg); color: var(--c-warn); border-color: transparent; }
+.chip--warn { background: var(--c-warn-bg); color: var(--c-warn-text); border-color: transparent; }
 .chip--accent { background: var(--c-accent-soft); color: var(--c-accent-text); border-color: var(--c-accent-line); }
 .chip .ico { width: 1em; height: 1em; }
 
@@ -515,10 +523,14 @@ html[data-theme="dark"] #btn-theme .ico-moon { display: block; }
 .streak__meta { font-size: .78rem; color: var(--c-text-dim); margin-top: 2px; }
 .heat { flex: 1 1 300px; min-width: 0; max-width: 100%; display: grid; gap: 6px; }
 .heat__scroll { display: flex; gap: 4px; min-width: 0; justify-content: flex-end; }
-.heat__clip { display: flex; justify-content: flex-end; overflow: hidden; min-width: 0; flex: 0 1 auto; }
+.heat__clip { display: flex; justify-content: flex-end; overflow: hidden; min-width: 0; flex: 0 1 auto;
+  padding: 3px;                   /* room for today's ring: the clip is for old weeks on the left, not for today */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 28px);
+          mask-image: linear-gradient(to right, transparent, #000 28px); }   /* older weeks fade out instead of being sliced */
 .heat__grid { display: flex; gap: 3px; justify-content: flex-end; min-width: 0; }
 .heat__days, .heat__col { display: grid; grid-template-rows: 14px repeat(7, 11px); gap: 3px; flex: none; }
 .heat__days span { font-size: .62rem; line-height: 11px; color: var(--c-text-dim); }
+.heat__days { padding: 3px 0; }  /* keep Mon/Wed/Fri level with the padded grid */
 .heat__month { font-size: .66rem; color: var(--c-text-dim); white-space: nowrap; width: 11px; overflow: visible; line-height: 12px; }
 .heat__month.is-end { direction: rtl; }
 .heat__cell { width: 11px; height: 11px; border-radius: 3px; background: var(--c-surface-2); box-shadow: inset 0 0 0 1px var(--c-border); }

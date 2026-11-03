@@ -391,6 +391,9 @@ function start(host, set, progress, session) {
 
     if (correct && !close && opts.instantNext) later(advance, 750);
     else requestAnimationFrame(() => nextBtn.focus({ preventScroll: true }));
+    // On a phone the verdict often lands below the fold (long choices push it
+    // down), so answering looked like nothing happened. Bring it into view.
+    requestAnimationFrame(() => revealVerdict(verdict, nextBtn.closest('.q-foot')));   // the new foot, not the emptied one above
 
     async function star() {
       q.term.starred = !q.term.starred;
@@ -431,6 +434,20 @@ function start(host, set, progress, session) {
     roundIndex++;
     busy = false;
     askNext();
+  }
+
+  /** Scroll just enough to show the verdict and the Continue button, never past the verdict's top. */
+  function revealVerdict(verdict, foot) {
+    if (!verdict || !verdict.isConnected) return;
+    const header = (document.querySelector('.topbar') || {}).offsetHeight || 58;
+    const top = verdict.getBoundingClientRect().top;
+    const bottom = (foot || verdict).getBoundingClientRect().bottom;
+    const room = window.innerHeight - 12;
+    if (bottom <= room && top >= header) return;                       // already fully visible
+    const by = Math.min(bottom - room, top - header - 8);              // show the foot, but keep the verdict's top
+    if (by <= 0) return;
+    const reduced = document.documentElement.dataset.motion === 'reduced' || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollBy({ top: by, behavior: reduced ? 'auto' : 'smooth' });
   }
 
   /* ---------- end screens ---------- */
