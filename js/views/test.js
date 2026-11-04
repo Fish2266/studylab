@@ -3,7 +3,7 @@
  * Questions are generated once from a seeded shuffle, so "retake this test"
  * reproduces the same paper while "new test" draws fresh questions.
  */
-import { el, setChildren, icon, shuffle, mulberry32, isTyping, plural, mmss, announce, clamp } from '../utils.js';
+import { el, setChildren, icon, shuffle, mulberry32, isTyping, plural, mmss, announce, clamp, keepFocus } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog } from '../ui.js';
 import { navigate } from '../router.js';
@@ -115,6 +115,7 @@ function controller(host, set, progress, session) {
         el('a', { class: 'btn', href: `#/set/${set.id}` }, 'Cancel')),
     ));
     refresh();
+    keepFocus(() => stage.querySelector('h2'));         // "Change options" from the results
   }
 
   /* ---------------- paper generation ---------------- */
@@ -163,6 +164,9 @@ function controller(host, set, progress, session) {
         submitBtn),
     );
     updateCounters();
+    // The Start/Retake button that had focus is gone: start keyboard users at question 1.
+    keepFocus(() => stage.querySelector('.test-q'));
+    announce(`Test started. ${plural(paper.questions.length, 'question')}.`);
 
     if (opts.timeLimit > 0) {
       deadline = Date.now() + opts.timeLimit * 60000;
@@ -460,6 +464,7 @@ function controller(host, set, progress, session) {
         el('button', { class: 'btn btn--primary', type: 'button', onclick: () => { buildPaper(); paintPaper(); window.scrollTo({ top: 0 }); } }, 'New test')));
 
     announce(`Test finished. Score ${pct} percent, ${right} of ${total} correct.`);
+    keepFocus(() => stage.querySelector('.test-score'));
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 

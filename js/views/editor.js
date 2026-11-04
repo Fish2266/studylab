@@ -4,7 +4,7 @@
  * delegated listener on the container, so a 2,000-term set still edits smoothly.
  * Edits autosave after a pause; leaving with unsaved work asks first.
  */
-import { el, icon, frag, autoGrow, debounce, plural } from '../utils.js';
+import { el, icon, frag, autoGrow, debounce, plural, keepFocus } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog, promptDialog, openMenu, modal } from '../ui.js';
 import { navigate, setGuard } from '../router.js';
@@ -180,6 +180,10 @@ function build(host, set, isNew) {
       row.querySelector('.edit-row__n').textContent = String(i + 1);
       row.querySelector('[data-f="term"]').setAttribute('aria-label', `Term ${i + 1}`);
       row.querySelector('[data-f="definition"]').setAttribute('aria-label', `Definition ${i + 1}`);
+      // the row's buttons are named by number too, or a screen reader says "Delete row 3" on row 2
+      const name = { drag: 'Reorder row', star: 'Star row', more: 'More options for row', del: 'Delete row' };
+      for (const btn of row.querySelectorAll('[data-a]')) if (name[btn.dataset.a]) btn.setAttribute('aria-label', `${name[btn.dataset.a]} ${i + 1}`);
+      const hint = row.querySelector('[data-f="hint"]'); if (hint) hint.setAttribute('aria-label', `Hint for row ${i + 1}`);
     }
   }
 
@@ -311,6 +315,8 @@ function build(host, set, isNew) {
     if (node && !hasHiddenRows) { node.remove(); shown--; renumber(i); paintMore(); }
     else paintRows();                                  // a hidden row moves up into view
 
+    // Deleting by button removes the focused button: carry on from the row that moved up.
+    if (!focusPrev) keepFocus(() => { const r = rowsHost.children[Math.min(i, rowsHost.children.length - 1)]; return r && r.querySelector('[data-a="del"]'); });
     if (focusPrev) {
       const prev = rowsHost.children[Math.max(0, i - 1)];
       const f = prev && prev.querySelector('[data-f="definition"]');

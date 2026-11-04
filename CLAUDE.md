@@ -52,6 +52,9 @@ No build step: edit files, reload.
   on the accent.
 - **Buttons.** Variants set `--btn-bg` / `--btn-bg-hover`; never set `background`
   directly in a `:hover` rule — that once blanked every hovered primary button.
+- **Keyboard.** Page-wide shortcuts must not take Enter/Space from buttons —
+  check `onControl(e)` first. When a view replaces the element that had focus,
+  call `keepFocus(() => target)` so keyboard users don't restart at the top.
 - UI audit script idea: drive every screen at 375/1200/dark and check cut text,
   overflow, overlaps, contrast, tap targets (see git log for the Nov 2026 audit).
 - Learn's "I was right" relies on `q.before` (card snapshot taken before

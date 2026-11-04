@@ -112,6 +112,40 @@ export function debounce(fn, ms = 250) {
 /* ---------- math / arrays ---------- */
 /** A phone or tablet: no hover, coarse pointer. Keyboard hints and focus rings are noise there. */
 export const isTouchScreen = () => typeof matchMedia === 'function' && matchMedia('(hover: none) and (pointer: coarse)').matches;
+/**
+ * Was this key pressed on a button, link or other native control? Then Enter
+ * and Space belong to that control, and page-wide shortcuts must leave them
+ * alone (they used to flip the flashcard instead of pressing "Know it", and
+ * skip past "I was right" in Learn).
+ */
+export function onControl(e, except = null) {
+  const t = e.target;
+  if (!(t instanceof Element)) return false;
+  const c = t.closest('button, a[href], select, summary, [role="button"], input[type="checkbox"], input[type="radio"]');
+  return !!c && c !== except;
+}
+
+/** Move focus to `el` without scrolling, making it focusable if it is not already. */
+export function focusQuietly(el) {
+  if (!el || !el.isConnected) return;
+  if (!el.matches('a[href], button, input, select, textarea, [tabindex]')) el.setAttribute('tabindex', '-1');
+  el.focus({ preventScroll: true });
+}
+
+/**
+ * After a view swaps out the element that had focus (a pressed button that no
+ * longer exists), focus would fall back to <body> and a keyboard user would
+ * start again from the top of the page. Put it somewhere sensible instead —
+ * but only if it was actually lost, so we never steal focus.
+ */
+export function keepFocus(pickTarget) {
+  requestAnimationFrame(() => {
+    const a = document.activeElement;
+    if (a && a !== document.body && a.isConnected) return;
+    focusQuietly(typeof pickTarget === 'function' ? pickTarget() : pickTarget);
+  });
+}
+
 export const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
 /** Deterministic PRNG so shuffles can be reproduced (test retakes, share links). */
 export function mulberry32(seed) {

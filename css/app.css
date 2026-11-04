@@ -134,7 +134,8 @@ svg { display: block; }
 :focus:not(:focus-visible) { outline: none; }
 /* Headings are focused programmatically after navigation so screen readers
    land in the right place; they should not draw a focus ring for that. */
-h1[tabindex="-1"]:focus, h1[tabindex="-1"]:focus-visible, .main:focus { outline: none; }
+/* Containers and headings that receive focus programmatically (focusQuietly) get no ring. */
+[tabindex="-1"]:focus, [tabindex="-1"]:focus-visible, .main:focus { outline: none; }
 ::selection { background: var(--c-accent); color: var(--c-accent-fg); }
 
 .sr-only {

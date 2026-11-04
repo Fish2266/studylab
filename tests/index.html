@@ -357,6 +357,40 @@ test('colours: every accent choice gets readable button text', async () => {
   eq(accentTones(245), { l: 58, fg: '#fff', textL: 42 }, 'default indigo is unchanged');
 });
 
+test('keyboard: shortcuts leave Enter/Space on buttons alone', async () => {
+  const { onControl } = await import('../js/utils.js');
+  const card = document.createElement('div'); card.setAttribute('role', 'button');
+  const inner = document.createElement('span'); card.appendChild(inner);
+  const btn = document.createElement('button'); const star = document.createElement('button'); card.appendChild(star);
+  const ev = (t) => ({ target: t });
+  eq([onControl(ev(btn)), onControl(ev(card, card), card), onControl(ev(inner), card), onControl(ev(star), card), onControl(ev(document.body))],
+     [true, false, false, true, false], 'button / the card itself / text in the card / a button in the card / page');
+});
+
+test('keyboard: focus is restored when the focused button disappears, never stolen', async () => {
+  const { keepFocus } = await import('../js/utils.js');
+  const frame = () => new Promise(r => requestAnimationFrame(() => r()));
+  const b = document.createElement('button'); b.textContent = 'Start'; document.body.appendChild(b); b.focus();
+  const target = document.createElement('div'); document.body.appendChild(target);
+  b.remove();                                           // like a view swapping out the pressed button
+  keepFocus(() => target); await frame(); await frame();
+  eq(document.activeElement, target, 'focus moved to the new content');
+  eq(target.getAttribute('tabindex'), '-1');
+  const other = document.createElement('input'); document.body.appendChild(other); other.focus();
+  keepFocus(() => target); await frame(); await frame();
+  eq(document.activeElement, other, 'focus that is still valid is left alone');
+  target.remove(); other.remove();
+});
+
+test('touch: sliders are a usable height on phones', async () => {
+  const f = await styledFrame(375);
+  try {
+    const r = f.contentDocument.createElement('input'); r.type = 'range'; r.className = 'range';
+    f.contentDocument.querySelector('main').appendChild(r);
+    ok(r.getBoundingClientRect().height >= 32, `slider is ${r.getBoundingClientRect().height}px tall`);
+  } finally { f.remove(); }
+});
+
 test('importers: real-world formats', async () => {
   const { parseAny } = await import('../js/importers.js');
   eq(parseAny('a\tone\nb\ttwo').terms.length, 2, 'quizlet tsv');

@@ -5,7 +5,7 @@
  * drops the term back and re-queues it inside the same round, so you always
  * finish a round having answered everything correctly at least once.
  */
-import { el, icon, shuffle, isTyping, announce, plural, clamp, isTouchScreen } from '../utils.js';
+import { el, icon, shuffle, isTyping, announce, plural, clamp, isTouchScreen, onControl, keepFocus } from '../utils.js';
 import * as data from '../data.js';
 import { toast, confirmDialog, segBar } from '../ui.js';
 import { navigate } from '../router.js';
@@ -493,6 +493,7 @@ function start(host, set, progress, session) {
         el('button', { class: 'btn', type: 'button', onclick: restart }, icon('undo'), 'Study again'),
         el('a', { class: 'btn btn--ghost', href: `#/set/${set.id}` }, 'Back to set'),
       )));
+    keepFocus(() => stage.querySelector('.btn--primary'));
   }
 
   function paintNoTerms() {
@@ -596,6 +597,7 @@ function start(host, set, progress, session) {
 
     if (e.key === 'Enter') {
       if (answered) {
+        if (onControl(e) && !e.target.closest('.q-foot .btn--primary')) return;   // "I was right", "Star this"… do their own thing
         e.preventDefault();
         const next = stage.querySelector('.q-foot .btn--primary') || stage.querySelector('.round-done .btn--primary');
         if (next) next.click();
@@ -623,7 +625,7 @@ function start(host, set, progress, session) {
         if (wrap && wrap._show) wrap._show();
         return;
       }
-      if (e.key === ' ' && q.kind !== 'written') { e.preventDefault(); }
+      if (e.key === ' ' && q.kind !== 'written' && !onControl(e)) { e.preventDefault(); }
     }
     const k = e.key.toLowerCase();
     if (k === 'o') {

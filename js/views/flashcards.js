@@ -1,5 +1,5 @@
 /* views/flashcards.js — classic flip cards with sorting, autoplay and audio. */
-import { el, icon, shuffle, isTyping, plural, announce, clamp } from '../utils.js';
+import { el, icon, shuffle, isTyping, plural, announce, clamp, onControl, keepFocus } from '../utils.js';
 import * as data from '../data.js';
 import { toast } from '../ui.js';
 import { navigate } from '../router.js';
@@ -143,7 +143,7 @@ function start(host, set, progress, session) {
     const term = current();
     if (!term) { paintDone(); return; }
     // Coming back from the end screen ("Start over"): put the card back.
-    if (swipeWrap.parentNode !== stage) stage.replaceChildren(swipeWrap);
+    if (swipeWrap.parentNode !== stage) { stage.replaceChildren(swipeWrap); keepFocus(() => cardEl); }
     swipe.reset();
     swipeLeftTag.textContent = opts.trackProgress ? 'Still learning' : 'Next';
     swipeRightTag.textContent = opts.trackProgress ? 'Know it' : 'Back';
@@ -212,6 +212,7 @@ function start(host, set, progress, session) {
     sortRow.remove();
     nav.hidden = true;
     stopPlay();
+    keepFocus(() => stage.querySelector('.round-done .btn'));
   }
 
   function countSorted() {
@@ -443,7 +444,7 @@ function start(host, set, progress, session) {
     if (isTyping(e) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (document.querySelector('.modal-backdrop')) return;
     const k = e.key.toLowerCase();
-    if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); flip(); }
+    if (e.key === ' ' || e.key === 'Enter') { if (onControl(e, cardEl)) return; e.preventDefault(); flip(); }
     else if (e.key === 'ArrowRight') { e.preventDefault(); step(1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); step(-1); }
     else if (k === 's') { e.preventDefault(); toggleStar(); }

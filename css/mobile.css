@@ -45,8 +45,6 @@
   .brand { position: relative; }
   .brand::after { content: ''; position: absolute; top: 50%; left: -6px; width: 44px; height: 44px; transform: translateY(-50%); }
   .toast__x { padding: 8px 10px; margin: -8px -6px -8px auto; }
-  /* sliders: the 16px track is hard to grab with a thumb */
-  .range { height: 32px; }
 }
 
 /* iOS zooms the whole page when you focus a control whose text is under 16px,
@@ -247,4 +245,11 @@
    keyboard; keep their space so the buttons beside them do not jump. */
 @media (hover: none) and (pointer: coarse) {
   .q-foot__hint { visibility: hidden; }
+}
+
+/* Sliders: Chromium's 16px-tall range input is hard to grab with a thumb.
+   Taller box = bigger target (tapping anywhere on it moves the value).
+   Also keyed on width, because touch detection is not reliable everywhere. */
+@media (pointer: coarse), (max-width: 600px) {
+  .range { height: 36px; }
 }
