@@ -101,9 +101,13 @@ export async function init() {
   index = (await store.kvGet('index')) || [];
   activity = cleanActivity(await store.kvGet('activity'));
   if (!Array.isArray(index)) index = [];
-  // Self-heal: if the index is empty but sets exist (or vice versa), rebuild.
-  const rows = await store.getAll('sets');
-  if (rows.length !== index.length) await rebuildIndex(rows);
+  index = index.filter(r => r && typeof r === 'object' && typeof r.id === 'string').map(cleanIndexRow);
+  // Self-heal: rebuild the index if it disagrees with what is stored. Compare
+  // ids only — reading every whole set here made start-up scale with the size
+  // of the library (776ms for 40 big sets on a phone-speed CPU).
+  const ids = await store.keys('sets');
+  const known = new Set(index.map(r => r && r.id));
+  if (ids.length !== index.length || ids.some(id => !known.has(id))) await rebuildIndex();
   return backend;
 }
 export async function rebuildIndex(rows) {
@@ -113,10 +117,18 @@ export async function rebuildIndex(rows) {
   return index;
 }
 function toIndexRow(s) {
+  const n = normalizeSet(s);                              // a damaged row must not put a null title into the index
   return {
-    id: s.id, title: s.title, description: s.description || '',
-    count: Array.isArray(s.terms) ? s.terms.length : 0,
-    createdAt: s.createdAt, updatedAt: s.updatedAt, folder: s.folder || '',
+    id: s.id, title: n.title, description: n.description,
+    count: n.terms.length,
+    createdAt: n.createdAt, updatedAt: n.updatedAt, folder: n.folder,
+  };
+}
+/** The stored index is cached data too; coerce every field so the library can trust it. */
+export function cleanIndexRow(r) {
+  return {
+    id: r.id, title: String(r.title ?? 'Untitled set') || 'Untitled set', description: String(r.description ?? ''),
+    count: Number(r.count) || 0, createdAt: Number(r.createdAt) || 0, updatedAt: Number(r.updatedAt) || 0, folder: String(r.folder ?? ''),
   };
 }
 
@@ -233,10 +245,20 @@ export async function duplicateSet(id) {
 /* ---------- progress ---------- */
 export async function getProgress(setId) {
   if (progressCache.has(setId)) return progressCache.get(setId);
-  const row = await store.get('progress', setId);
-  const p = row && typeof row === 'object' && row.cards ? row : { id: setId, cards: {}, updatedAt: 0, sessions: {} };
-  if (!p.sessions) p.sessions = {};
+  const p = cleanProgress(await store.get('progress', setId), setId);
   progressCache.set(setId, p);
+  return p;
+}
+/** Stored progress can be damaged (old versions, imports): make every card a well-formed object. */
+export function cleanProgress(row, setId) {
+  const p = row && typeof row === 'object' && row.cards && typeof row.cards === 'object' && !Array.isArray(row.cards)
+    ? row : { id: setId, cards: {}, updatedAt: 0, sessions: {} };
+  // One null entry used to crash the set page.
+  for (const [k, v] of Object.entries(p.cards)) {
+    if (!v || typeof v !== 'object' || Array.isArray(v)) delete p.cards[k];
+    else p.cards[k] = { ...DEFAULT_CARD, ...v };
+  }
+  if (!p.sessions || typeof p.sessions !== 'object') p.sessions = {};
   return p;
 }
 export async function saveProgress(p) {
@@ -404,5 +426,36 @@ export function streakInfo(days = activity.days, now = new Date()) {
     studiedToday: (days[today] || 0) > 0,
     totalDays: keys.length,
   };
+}
+
+/* ---------- searching inside sets ----------
+ * The library search box promises "sets and terms", but the index only holds
+ * titles. Terms are read on the first search and kept as lowercase text per set
+ * (refreshed when a set's updatedAt changes), so later keystrokes are just
+ * string scans in memory.
+ */
+const termText = new Map();          // set id -> { at, text: [lowercase "term\u0001definition"], terms: [original term] }
+export async function findInTerms(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const hits = new Map();            // set id -> the first matching term (as written)
+  if (q.length < 2) return hits;
+  const stale = index.filter(r => { const c = termText.get(r.id); return !c || c.at !== r.updatedAt; });
+  // A few sets at a time, yielding in between: one big getAll() froze a phone
+  // for half a second on a large library while the user was typing.
+  for (let i = 0; i < stale.length; i += 4) {
+    const rows = await Promise.all(stale.slice(i, i + 4).map(r => store.get('sets', r.id)));
+    for (const s of rows) {
+      if (!s || !Array.isArray(s.terms)) continue;
+      termText.set(s.id, { at: s.updatedAt, text: s.terms.map(t => `${t.term}\u0001${t.definition}`.toLowerCase()), terms: s.terms.map(t => t.term) });
+    }
+    if (i + 4 < stale.length) await new Promise(r => setTimeout(r, 0));
+  }
+  for (const r of index) {
+    const c = termText.get(r.id);
+    if (!c) continue;
+    const i = c.text.findIndex(x => x.includes(q));
+    if (i >= 0) hits.set(r.id, c.terms[i]);
+  }
+  return hits;
 }
 

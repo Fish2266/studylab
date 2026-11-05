@@ -71,7 +71,8 @@ async function handle() {
   if (!hit) { renderNotFound(mount); return; }
 
   try {
-    const mod = await hit.route.loader();
+    // Screens load on demand; one retry covers a dropped request on a flaky connection.
+    const mod = await hit.route.loader().catch(() => new Promise(r => setTimeout(r, 600)).then(() => hit.route.loader(true)));
     if (token !== navToken) return;              // a newer navigation won
     current = mod.render(mount, { params: hit.params, path }) || null;
   } catch (err) {
@@ -131,13 +132,21 @@ function renderNotFound(mount) {
   document.title = 'Not found · StudyLab';
 }
 function renderError(mount, err) {
+  const msg = String((err && err.message) || err || '');
+  // A screen's code could not be downloaded (offline on a first visit, or a dropped connection).
+  const notLoaded = /dynamically imported module|importing a module script failed|error loading dynamically|failed to fetch/i.test(msg);
+  // A failed module stays failed for this page, so the dependable retry is a reload: the
+  // route is in the URL and everything else is in storage, so nothing is lost.
+  const retry = () => location.reload();
   mount.appendChild(el('div', { class: 'empty' },
     el('div', { class: 'empty__icon' }, icon('warn')),
-    el('h1', {}, 'Something went wrong'),
-    el('p', {}, String((err && err.message) || err || 'Unknown error')),
+    el('h1', {}, notLoaded ? 'This screen could not load' : 'Something went wrong'),
+    el('p', {}, notLoaded
+      ? (navigator.onLine === false ? 'You are offline and this part of StudyLab has not been saved for offline use yet. Connect and try again — your sets are safe.' : 'The connection dropped while loading it. Your sets are safe.')
+      : msg || 'Unknown error'),
     el('div', { class: 'row', style: { justifyContent: 'center' } },
-      el('button', { class: 'btn', type: 'button', onclick: () => location.reload() }, 'Reload'),
-      el('a', { class: 'btn btn--primary', href: '#/' }, 'Back to library'))));
+      el('button', { class: 'btn btn--primary', type: 'button', onclick: retry }, 'Try again'),
+      el('a', { class: 'btn', href: '#/' }, 'Back to library'))));
 }
 
 export function startRouter() {

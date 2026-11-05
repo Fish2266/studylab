@@ -391,6 +391,48 @@ test('touch: sliders are a usable height on phones', async () => {
   } finally { f.remove(); }
 });
 
+test('damaged stored data is cleaned before any screen sees it', async () => {
+  const { cleanProgress, cleanIndexRow, normalizeSet } = await import('../js/data.js');
+  const p = cleanProgress({ id: 's', cards: { a: null, b: 'junk', c: [1], d: { status: 'mastered' } } }, 's');
+  eq(Object.keys(p.cards), ['d']); eq([p.cards.d.status, p.cards.d.streak, typeof p.sessions], ['mastered', 0, 'object']);
+  eq(cleanProgress(null, 'x').cards, {}); eq(cleanProgress({ cards: [] }, 'x').cards, {});
+  eq(cleanIndexRow({ id: 'i', title: null, count: '3', updatedAt: 'yesterday' }), { id: 'i', title: 'Untitled set', description: '', count: 3, createdAt: 0, updatedAt: 0, folder: '' });
+  const n = normalizeSet({ id: 'z', title: null, terms: [{ term: null, definition: 42 }, null, 'x'] });
+  eq([n.title, n.terms.length, typeof n.terms[0].term, n.terms[0].definition], ['Untitled set', 1, 'string', '42']);
+});
+
+test('storage: listing ids is cheap and agrees with a full read', async () => {
+  const store = await import('../js/storage.js');
+  await store.initStorage();
+  const ids = (await store.keys('sets')).map(String).sort();
+  const all = (await store.getAll('sets')).map(s => String(s.id)).sort();
+  eq(ids, all);                                       // read-only: never touches your sets
+});
+
+test('startup: modulepreload list matches what the first screen really imports', async () => {
+  const html = await (await fetch('../index.html', { cache: 'no-store' })).text();
+  const preloaded = [...html.matchAll(/<link rel="modulepreload" href="([^"]+)"/g)].map(m => m[1]).sort();
+  const seen = new Set();
+  const walk = async (path) => {
+    if (seen.has(path)) return; seen.add(path);
+    const src = await (await fetch('../' + path, { cache: 'no-store' })).text();
+    for (const m of src.matchAll(/^import [^;]*? from '([^']+)';|^import '([^']+)';/gm)) {
+      const rel = m[1] || m[2]; const url = new URL(rel, new URL('../' + path, location)); await walk(url.pathname.replace(/^.*?\/js\//, 'js/'));
+    }
+  };
+  await walk('js/main.js'); await walk('js/views/library.js');
+  eq(preloaded, [...seen].sort(), 'index.html modulepreload vs static import graph of main + library');
+});
+
+test('offline: every module is in the service worker shell (screens load on demand)', async () => {
+  const sw = await (await fetch('../sw.js', { cache: 'no-store' })).text();
+  const shell = new Set([...sw.matchAll(/'(js\/[^']+\.js)'/g)].map(m => m[1]));
+  const missing = [...MODULES, 'main'].map(m => `js/${m}.js`).filter(f => !shell.has(f));   // main is not imported here (it would boot the app) but must be cached
+  eq(missing, [], 'add these to SHELL in sw.js or that screen breaks offline');
+  ok(/cache: 'reload'/.test(sw), 'precache must bypass the HTTP cache');
+  ok(/if \(cached\) \{/.test(sw) && /const DEV = /.test(sw), 'shell stays cache-first (network-first only on localhost)');
+});
+
 test('importers: real-world formats', async () => {
   const { parseAny } = await import('../js/importers.js');
   eq(parseAny('a\tone\nb\ttwo').terms.length, 2, 'quizlet tsv');

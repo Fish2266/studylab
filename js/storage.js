@@ -73,6 +73,11 @@ const ls = {
     }
     return out;
   },
+  keys(store) {
+    const out = [], prefix = `${LS_PREFIX}${store}:`;
+    for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k && k.startsWith(prefix)) out.push(k.slice(prefix.length)); }
+    return out;
+  },
   put(store, value) { localStorage.setItem(lsKey(store, value.id), JSON.stringify(value)); },
   del(store, id) { localStorage.removeItem(lsKey(store, id)); },
   clear(store) {
@@ -89,6 +94,7 @@ const mem = {
   key: (s, id) => `${s}:${id}`,
   get(s, id) { return memory.get(mem.key(s, id)); },
   all(s) { return [...memory.entries()].filter(([k]) => k.startsWith(s + ':')).map(([, v]) => v); },
+  keys(s) { return [...memory.keys()].filter(k => k.startsWith(s + ':')).map(k => k.slice(s.length + 1)); },
   put(s, v) { memory.set(mem.key(s, v.id), v); },
   del(s, id) { memory.delete(mem.key(s, id)); },
   clear(s) { for (const k of [...memory.keys()]) if (k.startsWith(s + ':')) memory.delete(k); },
@@ -96,10 +102,17 @@ const mem = {
 
 /** Probe once at boot so the rest of the app can assume a working backend. */
 export async function initStorage() {
-  try {
+  const probe = async () => {
     await openDB();
     await idbRequest('kv', 'readwrite', s => s.put({ id: '__probe', t: Date.now() }));
     await idbRequest('kv', 'readwrite', s => s.delete('__probe'));
+  };
+  try {
+    // Two tries: iOS Safari can fail the first open after the app was in the
+    // background ("connection lost"). Falling back on one hiccup would show an
+    // empty library and start saving into localStorage, apart from the real sets.
+    try { await probe(); }
+    catch { dbPromise = null; await new Promise(r => setTimeout(r, 250)); await probe(); }
     backend = 'idb';
   } catch {
     try {
@@ -143,6 +156,11 @@ export function get(store, id) {
 export function getAll(store) {
   if (backend === 'idb') return withRetry(() => idbRequest(store, 'readonly', s => s.getAll()), 'read');
   return Promise.resolve((backend === 'ls' ? ls : mem).all(store));
+}
+/** Just the ids — cheap, unlike getAll() which reads every whole set. */
+export function keys(store) {
+  if (backend === 'idb') return withRetry(() => idbRequest(store, 'readonly', s => s.getAllKeys()), 'read');
+  return Promise.resolve((backend === 'ls' ? ls : mem).keys(store));
 }
 export function put(store, value) {
   if (backend === 'idb') return withRetry(() => idbRequest(store, 'readwrite', s => s.put(value)), 'save');

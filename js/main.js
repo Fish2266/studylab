@@ -4,33 +4,48 @@ import * as data from './data.js';
 import { applyAppearance, watchSystemTheme, nextTheme, THEME_LABEL } from './theme.js';
 import { addRoute, startRouter, navigate } from './router.js';
 import { toast } from './ui.js';
-import { openShortcutsDialog } from './views/dialogs.js';
 
-import * as library from './views/library.js';
-import * as setview from './views/setview.js';
-import * as editor from './views/editor.js';
-import * as flashcards from './views/flashcards.js';
-import * as learn from './views/learn.js';
-import * as test from './views/test.js';
-import * as match from './views/match.js';
-import * as importview from './views/importview.js';
-import * as settings from './views/settings.js';
-import * as shared from './views/shared.js';
-
-const mod = (m) => () => Promise.resolve(m);
+/* Screens load on demand: the first paint only needs the library (and its few
+ * imports, preloaded from index.html), not all 30-odd modules. The rest are
+ * fetched in the background right after (prefetchViews), so moving around is
+ * still instant. Loading everything up front made a first visit arrive in five
+ * sequential waves of requests — 3.3s before the library showed on a 4G phone. */
+// `retry` re-requests under a fresh URL: browsers remember a failed module load
+// and would otherwise fail the same import() again for the life of the page.
+const view = (path) => (retry = false) => import(retry ? `${path}?retry=${Date.now()}` : path);
+const VIEWS = {
+  library: view('./views/library.js'),
+  setview: view('./views/setview.js'),
+  editor: view('./views/editor.js'),
+  flashcards: view('./views/flashcards.js'),
+  learn: view('./views/learn.js'),
+  test: view('./views/test.js'),
+  match: view('./views/match.js'),
+  importview: view('./views/importview.js'),
+  settings: view('./views/settings.js'),
+  shared: view('./views/shared.js'),
+};
+const openShortcutsDialog = () => import('./views/dialogs.js').then(m => m.openShortcutsDialog());
 
 function registerRoutes() {
-  addRoute(/^\/$/, mod(library));
-  addRoute(/^\/create$/, mod(editor));
-  addRoute(/^\/import(?:\?.*)?$/, mod(importview));
-  addRoute(/^\/settings$/, mod(settings));
-  addRoute(/^\/s\/(.+)$/, mod(shared));
-  addRoute(/^\/set\/([^/?]+)\/edit$/, mod(editor));
-  addRoute(/^\/set\/([^/?]+)\/flashcards$/, mod(flashcards));
-  addRoute(/^\/set\/([^/?]+)\/learn$/, mod(learn));
-  addRoute(/^\/set\/([^/?]+)\/test$/, mod(test));
-  addRoute(/^\/set\/([^/?]+)\/match$/, mod(match));
-  addRoute(/^\/set\/([^/?]+)$/, mod(setview));
+  addRoute(/^\/$/, VIEWS.library);
+  addRoute(/^\/create$/, VIEWS.editor);
+  addRoute(/^\/import(?:\?.*)?$/, VIEWS.importview);
+  addRoute(/^\/settings$/, VIEWS.settings);
+  addRoute(/^\/s\/(.+)$/, VIEWS.shared);
+  addRoute(/^\/set\/([^/?]+)\/edit$/, VIEWS.editor);
+  addRoute(/^\/set\/([^/?]+)\/flashcards$/, VIEWS.flashcards);
+  addRoute(/^\/set\/([^/?]+)\/learn$/, VIEWS.learn);
+  addRoute(/^\/set\/([^/?]+)\/test$/, VIEWS.test);
+  addRoute(/^\/set\/([^/?]+)\/match$/, VIEWS.match);
+  addRoute(/^\/set\/([^/?]+)$/, VIEWS.setview);
+}
+
+/** Warm every other screen once the first one is on screen and the browser is idle. */
+function prefetchViews() {
+  const go = () => { for (const load of Object.values(VIEWS)) load().catch(() => { /* offline on a first visit: fetched (fresh) on demand later */ }); };
+  if ('requestIdleCallback' in window) requestIdleCallback(go, { timeout: 3000 });
+  else setTimeout(go, 1200);
 }
 
 /* ---------- global keyboard shortcuts ---------- */
@@ -92,7 +107,25 @@ function installServiceWorker() {
   // deploy — can sit unnoticed for as long as the cache headers allow.
   const register = () => navigator.serviceWorker
     .register('sw.js', { updateViaCache: 'none' })
+    .then(reg => {
+      // A home-screen app can stay open for days: look for a new version when it comes back to the front.
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') reg.update().catch(() => {}); });
+    })
     .catch(() => { /* offline support is a bonus, not a requirement */ });
+
+  // The worker is cache-first, so a new deploy arrives as a new worker taking
+  // over (controllerchange). Swap to it straight away if the app was only just
+  // opened on a screen with nothing in progress; otherwise ask, so an update
+  // never throws away a Learn round, a test or unsaved edits.
+  const hadController = !!navigator.serviceWorker.controller;   // first install: nothing to update from
+  let reloading = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController || reloading) return;
+    const route = location.hash.replace(/^#/, '') || '/';
+    const calm = /^\/(?:|settings|set\/[^/]+)$/.test(route) && !document.querySelector('.modal-backdrop');
+    if (calm && performance.now() < 10000) { reloading = true; location.reload(); return; }
+    toast('StudyLab has been updated.', { timeout: 0, action: { label: 'Reload', onClick: () => { reloading = true; location.reload(); } } });
+  });
   if (document.readyState === 'complete') register();
   else window.addEventListener('load', register, { once: true });
 }
@@ -130,6 +163,7 @@ async function boot() {
     installShortcuts();
     registerRoutes();
     startRouter();
+    prefetchViews();
     installServiceWorker();
     // First study of the day: a small nudge that the streak grew.
     window.addEventListener('studylab:streak', (e) => {

@@ -618,3 +618,5 @@ html[data-theme="dark"] {
 .match-mini { display: inline-flex; align-items: flex-end; min-height: 36px; }
 .streak__flurry { margin-left: auto; align-self: flex-end; }
 .empty .buddy-hero { margin-bottom: 10px; }
+.set-card__match { font-size: .84rem; color: var(--c-text-mid); margin: 2px 0 0; overflow-wrap: anywhere; }
+.set-card__match mark { background: var(--c-accent-soft); color: var(--c-accent-text); border-radius: 4px; padding: 0 3px; }

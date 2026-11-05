@@ -22,10 +22,16 @@ No build step: edit files, reload.
   `css/mobile.css` holds the iPhone-specific rules.
 
 ## Gotchas
-- **Service worker caching.** `sw.js` serves cached files first. Bump
-  `const VERSION = 'studylab-vN'` on every deploy that changes app files, or
-  users (and your own browser) keep running old code. When testing locally,
-  unregister the SW (DevTools → Application) if behaviour looks stale.
+- **Service worker caching.** `sw.js` is cache-first for the shell (instant
+  repeat visits, works offline). Bump `const VERSION = 'studylab-vN'` on every
+  deploy that changes app files — that is the only thing that makes users get
+  new code (main.js then reloads if nothing is in progress, else shows a
+  "Reload" toast). On `localhost` the shell is network-first so local edits
+  show on reload; to test real SW behaviour, open `http://127.0.0.1:8780`.
+- **Loading.** Screens are lazy (`VIEWS` in main.js) and the first screen's
+  imports are listed as `<link rel="modulepreload">` in index.html. Adding an
+  import to main/library/streak/mascot/… means adding it there too — the tests
+  page checks the list against the real import graph.
 - **Adding/removing/renaming a JS or CSS file?** Update the `SHELL` list in
   `sw.js` — the test page fails if it lists a missing file.
 - Never pass `null`/conditionals straight to `replaceChildren`/`append`

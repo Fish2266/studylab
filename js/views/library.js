@@ -3,7 +3,9 @@ import { el, icon, frag, relTime, plural, debounce, truncate, isTouchScreen } fr
 import * as data from '../data.js';
 import { toast, confirmDialog, openMenu } from '../ui.js';
 import { navigate } from '../router.js';
-import { openExportDialog, openShareDialog } from './dialogs.js';
+// Dialogs (and the QR encoder behind Share) load when first used, not with the library.
+const openExportDialog = (set) => import('./dialogs.js').then(m => m.openExportDialog(set));
+const openShareDialog = (set) => import('./dialogs.js').then(m => m.openShareDialog(set));
 import { streakCard } from './streak.js';
 import { hero } from '../mascot.js';
 
@@ -26,7 +28,15 @@ export function render(mount) {
     class: 'input toolbar__search toolbar__search--wide', type: 'search', placeholder: 'Search sets and terms…',
     'aria-label': 'Search sets', id: 'lib-search',
   });
-  const onSearch = debounce(() => { query = search.value.trim().toLowerCase(); shown = PAGE; paint(); }, 160);
+  // Titles match instantly; matches inside sets' terms arrive a moment later.
+  let termHits = new Map();
+  let searchToken = 0;
+  const onSearch = debounce(() => {
+    query = search.value.trim().toLowerCase(); shown = PAGE; termHits = new Map();
+    paint();
+    const token = ++searchToken, q = query;
+    if (q.length >= 2) data.findInTerms(q).then(h => { if (token === searchToken) { termHits = h; paint(); } }).catch(() => {});
+  }, 160);
   search.addEventListener('input', onSearch);
 
   const sortSel = el('select', { class: 'select', 'aria-label': 'Sort sets', style: { width: 'auto' }, onchange: e => {
@@ -73,7 +83,7 @@ export function render(mount) {
     const idx = data.getIndex();
     let rows = idx;
     if (folder) rows = rows.filter(r => r.folder === folder);
-    if (query) rows = rows.filter(r => r.title.toLowerCase().includes(query) || r.description.toLowerCase().includes(query));
+    if (query) rows = rows.filter(r => r.title.toLowerCase().includes(query) || r.description.toLowerCase().includes(query) || termHits.has(r.id));
     const by = {
       updated: (a, b) => b.updatedAt - a.updatedAt,
       created: (a, b) => b.createdAt - a.createdAt,
@@ -167,6 +177,9 @@ export function render(mount) {
       onclick: (e) => { e.preventDefault(); e.stopPropagation(); openMenu(menuBtn, cardMenu(row)); },
     }, icon('dots'));
 
+    // Found by a term rather than the title: say which one.
+    const viaTerm = query && termHits.has(row.id) && !row.title.toLowerCase().includes(query) && !row.description.toLowerCase().includes(query)
+      ? el('p', { class: 'set-card__match' }, 'Has “', el('mark', {}, truncate(termHits.get(row.id), 60)), '”') : null;
     const meta = el('div', { class: 'set-card__meta' },
       el('span', { class: 'chip' }, plural(row.count, 'term')),
       masteryChip(row),
@@ -179,7 +192,7 @@ export function render(mount) {
         el('a', { class: 'set-card__link', href: `#/set/${row.id}`, 'aria-label': `Open ${row.title}` }),
         el('div', { style: { flex: '1', minWidth: '0' } },
           el('div', { class: 'set-card__title' }, row.title),
-          row.description ? el('p', { class: 'set-card__desc' }, row.description) : null),
+          row.description ? el('p', { class: 'set-card__desc' }, row.description) : null, viaTerm),
         meta, el('div', { class: 'set-card__menu' }, menuBtn));
     }
     return el('div', { class: 'set-card' },
@@ -188,6 +201,7 @@ export function render(mount) {
         el('div', { class: 'set-card__title' }, row.title),
         el('div', { class: 'set-card__menu' }, menuBtn)),
       row.description ? el('p', { class: 'set-card__desc' }, row.description) : null,
+      viaTerm,
       meta);
   }
 

@@ -37,6 +37,20 @@
 <link rel="stylesheet" href="css/app.css">
 <link rel="stylesheet" href="css/modes.css">
 <link rel="stylesheet" href="css/mobile.css">
+<!-- Everything the first screen imports, requested in one go. Without these the
+     browser only discovers each import after the file importing it arrives,
+     which cost five round trips. Other screens load on demand (see main.js);
+     the tests page checks this list against the real import graph. -->
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/utils.js">
+<link rel="modulepreload" href="js/data.js">
+<link rel="modulepreload" href="js/storage.js">
+<link rel="modulepreload" href="js/theme.js">
+<link rel="modulepreload" href="js/router.js">
+<link rel="modulepreload" href="js/ui.js">
+<link rel="modulepreload" href="js/views/library.js">
+<link rel="modulepreload" href="js/views/streak.js">
+<link rel="modulepreload" href="js/mascot.js">
 </head>
 <body>
 <a class="skip-link" href="#main">Skip to main content</a>
